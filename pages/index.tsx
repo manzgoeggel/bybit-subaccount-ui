@@ -2,18 +2,28 @@
 
 import { ContractClient, OrderSide } from "bybit-api";
 import { useEffect, useMemo, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { Position, PositionTable } from "../components/PositionTable";
 
+
+export enum AccountType {
+	MAIN = "main",
+	SUB = "sub"
+}
+
+
 interface SubAccount {
-	[key: string]: {
+	[accountId: string]: {
 		key: string;
 		secret: string;
+		type: AccountType
 	};
 }
 
 interface PerpClient {
 	perpClient: ContractClient;
 	id: string;
+	type: AccountType
 }
 
 interface ClientPositions {
@@ -23,15 +33,22 @@ interface ClientPositions {
 }
 
 export default function SubAccountDashboard() {
-	const subAccounts = useMemo(() => {
+	const accounts = useMemo(() => {
 		return {
+			"1139313": {
+				key: "VGO4EhQVl6QKdR3ASz",
+				secret: "xZ9nkI81I9uLqoHyKtoQckYxWO0YNYKA9lwl",
+				type: AccountType.MAIN
+			},
 			"1139316": {
 				key: "VSCWAWNSXFGQIKKJMZ",
 				secret: "LVFXFVRQQQTAAFWHSFOAEJRQKYYECFUADFPF",
+				type: AccountType.SUB
 			},
 			"1139320": {
 				key: "CDFHLEYPHMHJHGCDQQ",
 				secret: "KREGUSISSNHTNQAESTHDMRRHPIPTXZNVUIQJ",
+				type: AccountType.SUB
 			},
 		};
 	}, []);
@@ -39,17 +56,17 @@ export default function SubAccountDashboard() {
 	const [perpClients, setPerpClients] = useState<PerpClient[]>([]);
 	const [clientPositions, setClientPositions] = useState<ClientPositions>({});
 
-	async function initiateClients(subAccounts: SubAccount): Promise<PerpClient[]> {
+	async function initiateClients(accounts: SubAccount): Promise<PerpClient[]> {
 		//initiate the client for each subaccount
 		const clients: PerpClient[] = [];
-		Object.keys(subAccounts).forEach((i) => {
+		Object.keys(accounts).forEach((i) => {
 			const perpClient = new ContractClient({
-				key: subAccounts[i].key,
-				secret: subAccounts[i].secret,
+				key: accounts[i].key,
+				secret: accounts[i].secret,
 				strict_param_validation: true,
 				testnet: true,
 			});
-			clients.push({ perpClient, id: i });
+			clients.push({ perpClient, id: i, type: accounts[i].type });
 		});
 		return clients;
 	}
@@ -68,20 +85,20 @@ export default function SubAccountDashboard() {
 	useEffect(() => {
 		(async () => {
 			try {
-				const clients = await initiateClients(subAccounts);
+				const clients = await initiateClients(accounts);
 
 				setPerpClients(clients);
 			} catch (err) {
 				console.log(err);
 			}
 		})();
-	}, [subAccounts]);
+	}, [accounts]);
 
 	useEffect(() => {
 		const id = setInterval(async () => {
 			const positions = await getAllPositions(perpClients);
 			setClientPositions(positions);
-		}, 500);
+		}, 1000);
 
 		// fetchData(); // <-- (2) invoke on mount
 
@@ -89,13 +106,39 @@ export default function SubAccountDashboard() {
 	}, [perpClients]);
 
 	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string): Promise<void> {
-      await client.submitOrder({
+		await client.submitOrder({
 			symbol,
 			side,
 			orderType: "Market",
 			qty,
 			timeInForce: "FillOrKill",
 		});
+	}
+
+	//IN = into main account from subaccount
+	//OUT = into subaccoutn from main account
+	async function transferAssetsInternally(amount: string, coin: string, subAccountId: string, direction: "IN" | "OUT") {
+		const mainAccount = perpClients.find((client) => client.type === "main");
+		if (mainAccount === undefined) {
+			return;
+		}
+
+		const transfer = await mainAccount.perpClient.postPrivate("/asset/v3/private/transfer/universal-transfer", {
+			transferId: uuidv4(),
+			coin,
+			amount,
+			fromMemberId: direction === "IN" ? subAccountId : mainAccount.id,
+			toMemberId: direction === "IN" ? mainAccount.id : subAccountId,
+			fromAccountType: "CONTRACT",
+			toAccountType: "CONTRACT",
+		});
+
+		if (transfer.retMsg === "OK") {
+			const clients = await initiateClients(accounts);
+
+			setPerpClients(clients);
+		}
+		console.log("TRANSFER!🎉", transfer);
 	}
 
 	return (
@@ -105,11 +148,13 @@ export default function SubAccountDashboard() {
 					perpClients.map((account, index) => (
 						<PositionTable
 							key={account.id}
-							subAccountId={account.id}
+							accountId={account.id}
 							positions={clientPositions[account.id].positions}
 							colorIndex={index}
 							client={account.perpClient}
 							closePosition={closePosition}
+							type={account.type}
+							transferAssetsInternally={transferAssetsInternally}
 						/>
 					))}
 			</div>

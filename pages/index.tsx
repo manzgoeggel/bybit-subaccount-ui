@@ -2,6 +2,7 @@
 
 import { ContractClient, OrderSide } from "bybit-api";
 import { useEffect, useMemo, useState } from "react";
+import { useKeyPress } from "react-use";
 import { v4 as uuidv4 } from "uuid";
 import AssetTransferModal from "../components/account-transfer/AssetTransferModal";
 import { Asset, Position, PositionTable } from "../components/PositionTable";
@@ -61,6 +62,9 @@ export default function AccountDashboard() {
 	const [clientPositions, setClientPositions] = useState<ClientPositions>({});
 	const [clientAssets, setClientAssets] = useState<ClientAssets>({});
 	const [allAssets, setAllAssets] = useState<Asset[]>([]);
+	const [openTransferModal, setOpenTransferModal] = useState(false);
+	const isCmdKPressed = useKeyPress((e) => e.metaKey && e.key === "k");
+
 
 	async function initiateClients(accounts: Account): Promise<PerpClient[]> {
 		//initiate the client for each Account
@@ -224,7 +228,15 @@ export default function AccountDashboard() {
 			console.log(err);
 		}
 	}
-
+	useEffect(() => {
+		if (isCmdKPressed[0]) {
+			if (!openTransferModal) {
+				setOpenTransferModal(true);
+			} else {
+				setOpenTransferModal(false);
+			}
+		}
+	}, [isCmdKPressed]);
 	return (
 		<div className="h-screen w-screen bg-gray-50 flex flex-col justify-center">
 			<AssetTransferModal
@@ -232,6 +244,8 @@ export default function AccountDashboard() {
 				clientAssets={clientAssets}
 				allAssets={allAssets}
 				transferAssetsInternally={transferAssetsInternally}
+				open={openTransferModal}
+				setOpen={setOpenTransferModal}
 			/>
 			<div className="mx-auto max-w-7xl sm:px-6 lg:px-8 bg-white w-full py-10 space-y-5">
 				{Object.keys(clientPositions).length > 0 &&

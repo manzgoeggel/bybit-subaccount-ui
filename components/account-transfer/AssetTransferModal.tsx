@@ -13,10 +13,11 @@ interface AssetTransferModalProps {
 	clientAssets: ClientAssets;
 	allAssets: Asset[];
 	transferAssetsInternally: (amount: string, coin: string, fromAccountId: string, toAccountId: string) => void;
+	open: boolean; 
+	setOpen: (value: boolean) => void;
 }
 
-export default function AssetTransferModal({ accounts, clientAssets, allAssets, transferAssetsInternally }: AssetTransferModalProps) {
-	const [open, setOpen] = useState(true);
+export default function AssetTransferModal({ accounts, clientAssets, allAssets, transferAssetsInternally, open, setOpen}: AssetTransferModalProps) {
 	const [selectedFromAccount, setSelectedFromAccount] = useState("");
 	const [selectedToAccount, setSelectedToAccount] = useState("");
 	const [selectedAsset, setSelectedAsset] = useState<Asset>();

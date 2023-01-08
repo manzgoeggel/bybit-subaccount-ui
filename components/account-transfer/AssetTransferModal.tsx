@@ -1,39 +1,50 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { ArrowsRightLeftIcon } from "@heroicons/react/20/solid";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { Asset } from "../PositionTable";
 import Amount from "./Amount";
 import SelectAccount from "./SelectAccount";
 import SelectCoin from "./SelectCoin";
 
-import { Account, AccountType } from "../../pages/index";
-export default function AssetTransferModal() {
-	const [open, setOpen] = useState(true);
-	const [selectedFromAccount, setSelectedFromAccount] = useState("1139313");
-	const [selectedToAccount, setSelectedToAccount] = useState("1139316");
+import { Account, ClientAssets } from "../../pages/index";
 
-	const mockAccounts: Account = {
-		"1139313": {
-			key: "VGO4EhQVl6QKdR3ASz",
-			secret: "xZ9nkI81I9uLqoHyKtoQckYxWO0YNYKA9lwl",
-			type: AccountType.MAIN,
-		},
-		"1139316": {
-			key: "VSCWAWNSXFGQIKKJMZ",
-			secret: "LVFXFVRQQQTAAFWHSFOAEJRQKYYECFUADFPF",
-			type: AccountType.SUB,
-		},
-		"1139320": {
-			key: "CDFHLEYPHMHJHGCDQQ",
-			secret: "KREGUSISSNHTNQAESTHDMRRHPIPTXZNVUIQJ",
-			type: AccountType.SUB,
-		},
-	};
+interface AssetTransferModalProps {
+	accounts: Account;
+	clientAssets: ClientAssets;
+	allAssets: Asset[];
+	transferAssetsInternally: (amount: string, coin: string, fromAccountId: string, toAccountId: string) => void;
+}
+
+export default function AssetTransferModal({ accounts, clientAssets, allAssets, transferAssetsInternally }: AssetTransferModalProps) {
+	const [open, setOpen] = useState(true);
+	const [selectedFromAccount, setSelectedFromAccount] = useState("");
+	const [selectedToAccount, setSelectedToAccount] = useState("");
+	const [selectedAsset, setSelectedAsset] = useState<Asset>();
+	const [amount, setAmount] = useState("0");
+
+	useEffect(() => {
+		if (allAssets !== undefined && allAssets.length > 0) {
+			console.log("coin", allAssets[0]);
+			setSelectedAsset(allAssets[0]);
+		}
+	}, [allAssets]);
 
 	function swapSelectedAccounts() {
 		const x = selectedFromAccount;
 		const y = selectedToAccount;
 		setSelectedFromAccount(y);
 		setSelectedToAccount(x);
+	}
+
+	async function transferAssets() {
+		try {
+			if (selectedAsset === undefined || Number(amount) <= 0 || selectedFromAccount.length <= 0 || selectedToAccount.length <= 0) {
+				return;
+			}
+			await transferAssetsInternally(`${Number(amount).toFixed(2)}`, selectedAsset.coin, selectedFromAccount, selectedToAccount);
+		} catch (err) {
+			console.log(err);
+		}
 	}
 
 	return (
@@ -77,7 +88,7 @@ export default function AssetTransferModal() {
 									<div className="flex justify-between items-center">
 										<div className="w-2/5">
 											<SelectAccount
-												accounts={mockAccounts}
+												accounts={accounts}
 												description={"From"}
 												selectedAccount={selectedFromAccount}
 												setSelectedAccount={setSelectedFromAccount}
@@ -93,7 +104,7 @@ export default function AssetTransferModal() {
 
 										<div className="w-2/5">
 											<SelectAccount
-												accounts={mockAccounts}
+												accounts={accounts}
 												description={"To"}
 												selectedAccount={selectedToAccount}
 												setSelectedAccount={setSelectedToAccount}
@@ -103,17 +114,24 @@ export default function AssetTransferModal() {
 									</div>
 
 									<div className="flex justify-between w-full">
-										<SelectCoin />
+										{allAssets.length > 0 && allAssets !== undefined && selectedAsset && (
+											<SelectCoin assets={allAssets} selectedAsset={selectedAsset} setSelectedAsset={setSelectedAsset} />
+										)}
 									</div>
 									<div className="flex justify-between w-full">
-										<Amount />
+										{allAssets.length > 0 && allAssets !== undefined && selectedAsset && (
+											<Amount amount={amount} setAmount={setAmount} asset={selectedAsset} />
+										)}
 									</div>
 								</div>
 								<div className="mt-5 sm:mt-6">
 									<button
+										disabled={
+											selectedAsset === undefined || Number(amount) <= 0 || selectedFromAccount.length <= 0 || selectedToAccount.length <= 0
+										}
 										type="button"
-										className="inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:text-sm"
-										onClick={() => setOpen(false)}
+										className="disabled:opacity-50 disabled:cursor-not-allowed inline-flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:text-sm"
+										onClick={transferAssets}
 									>
 										Transfer
 									</button>

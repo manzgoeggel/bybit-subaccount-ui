@@ -16,9 +16,13 @@ interface SelectAccountProps {
 	selectedAccountTwo: string;
 }
 
-export default function SelectAccount(
-	{ accounts, description, selectedAccount, setSelectedAccount, selectedAccountTwo }: SelectAccountProps
-) {
+export default function SelectAccount({
+	accounts,
+	description,
+	selectedAccount,
+	setSelectedAccount,
+	selectedAccountTwo,
+}: SelectAccountProps) {
 	return (
 		<Listbox
 			value={selectedAccount}
@@ -33,19 +37,21 @@ export default function SelectAccount(
 					<Listbox.Label className="block text-xs font-medium text-gray-700">{description}</Listbox.Label>
 					<div className="relative mt-1 w-full">
 						<Listbox.Button className="relative w-full cursor-default rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm">
-							<span className="flex items-center justify-between pr-2">
+							<span className="flex items-center justify-between pr-2 h-5">
 								{/* <img src={selectedAccount.avatar} alt="" className="h-6 w-6 flex-shrink-0 rounded-full" /> */}
 								<span className="ml-3 block truncate">{selectedAccount}</span>
 
-								<span
-									className={`inline-flex items-center rounded ${
-										accounts[selectedAccount].type === AccountType.MAIN ? "bg-blue-100" : "bg-fuchsia-100"
-									} px-2 py-0.5 w-12 text-center flex justify-center text-xs font-medium ${
-										accounts[selectedAccount].type === AccountType.MAIN ? "text-blue-800" : "text-fuchsia-800"
-									}`}
-								>
-									{accounts[selectedAccount].type}
-								</span>
+								{selectedAccount.length > 0 && (
+									<span
+										className={`inline-flex items-center rounded ${
+											accounts[selectedAccount].type === AccountType.MAIN ? "bg-blue-100" : "bg-fuchsia-100"
+										} px-2 py-0.5 w-12 text-center flex justify-center text-xs font-medium ${
+											accounts[selectedAccount].type === AccountType.MAIN ? "text-blue-800" : "text-fuchsia-800"
+										}`}
+									>
+										{accounts[selectedAccount].type}
+									</span>
+								)}
 							</span>
 							<span className="pointer-events-none absolute inset-y-0 right-0 ml-3 flex items-center pr-2">
 								<ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />

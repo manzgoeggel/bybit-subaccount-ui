@@ -1,7 +1,7 @@
 import { ContractClient, OrderSide } from "bybit-api";
 import { useEffect, useMemo, useState } from "react";
 
-import {AccountType} from "../pages/index";
+import { AccountType } from "../pages/index";
 export interface Position {
 	positionIdx: number;
 	riskId: number;
@@ -40,12 +40,11 @@ interface PositionTableProps {
 	positions: Position[];
 	colorIndex: number;
 	closePosition: (client: ContractClient, symbol: string, side: OrderSide, qty: string) => void;
-	transferAssetsInternally: (amount: string, coin: string, accountId: string, direction: "IN" | "OUT") => void;
 	client: ContractClient;
 	type: AccountType
 }
 
-interface Asset {
+export interface Asset {
 	coin: string;
 	equity: string;
 	walletBalance: string;
@@ -69,7 +68,6 @@ export function PositionTable({
 	closePosition,
 	client,
 	type,
-	transferAssetsInternally,
 }: PositionTableProps) {
 	const colors = ["blue", "purple", "green", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose"];
 	const [assets, setAssets] = useState<Asset[]>([]);
@@ -108,7 +106,7 @@ export function PositionTable({
 						}
 					});
 					setAssets(assets_);
-					console.log("assets", assets_);
+
 				}
 			} catch (err) {
 				console.log(err);
@@ -136,20 +134,7 @@ export function PositionTable({
 											{asset.coin}: {asset.availableBalance}
 										</div>
 
-										<button
-											type="button"
-											onClick={() => {
-												transferAssetsInternally(
-													`${(Number(asset.availableBalance) / 2).toFixed(2)}`,
-													asset.coin,
-													accountId,
-													type === AccountType.MAIN ? "OUT" : "IN"
-												);
-											}}
-											className="inline-flex items-center rounded border border-transparent bg-indigo-100 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-										>
-											transfer 50% of the assets to {type === AccountType.MAIN ? "subaccount" : "mainaccount"}
-										</button>
+						
 									</div>
 								))}
 							</div>

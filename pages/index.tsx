@@ -4,8 +4,7 @@ import { ContractClient, OrderSide } from "bybit-api";
 import { useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import AssetTransferModal from "../components/account-transfer/AssetTransferModal";
-import { Position, PositionTable } from "../components/PositionTable";
-
+import { Asset, Position, PositionTable } from "../components/PositionTable";
 export enum AccountType {
 	MAIN = "main",
 	SUB = "sub",
@@ -28,6 +27,12 @@ interface PerpClient {
 interface ClientPositions {
 	[key: string]: {
 		positions: Position[];
+	};
+}
+
+export interface ClientAssets {
+	[key: string]: {
+		assets: Asset[];
 	};
 }
 
@@ -54,6 +59,8 @@ export default function AccountDashboard() {
 
 	const [perpClients, setPerpClients] = useState<PerpClient[]>([]);
 	const [clientPositions, setClientPositions] = useState<ClientPositions>({});
+	const [clientAssets, setClientAssets] = useState<ClientAssets>({});
+	const [allAssets, setAllAssets] = useState<Asset[]>([]);
 
 	async function initiateClients(accounts: Account): Promise<PerpClient[]> {
 		//initiate the client for each Account
@@ -81,6 +88,18 @@ export default function AccountDashboard() {
 		return clientPositions;
 	}
 
+	function filterDuplicateAssets(assets: Asset[]): Asset[] {
+		const seenCoins = new Set();
+		return assets.filter((asset) => {
+			if (seenCoins.has(asset.coin)) {
+				return false;
+			} else {
+				seenCoins.add(asset.coin);
+				return true;
+			}
+		});
+	}
+
 	useEffect(() => {
 		(async () => {
 			try {
@@ -99,9 +118,37 @@ export default function AccountDashboard() {
 			setClientPositions(positions);
 		}, 1000);
 
-		// fetchData(); // <-- (2) invoke on mount
-
 		return () => clearInterval(id);
+	}, [perpClients]);
+
+	//get all derivative assets over > 0, for each client
+	useEffect(() => {
+		(async () => {
+			try {
+				let clientAssets = {};
+				let assets: Asset[] = [];
+				for await (const client of Object.keys(perpClients)) {
+					const { id, perpClient } = perpClients[client];
+
+					const response = await perpClient.getBalances();
+
+					if (response.result.list.length > 0) {
+						const assets_ = response.result.list.filter((asset: Asset) => {
+							if (Number(asset.equity) > 0) {
+								return asset;
+							}
+						});
+						clientAssets[id] = assets_;
+						assets = [...assets, ...assets_];
+					}
+				}
+				console.log("test", filterDuplicateAssets(assets));
+				setAllAssets(filterDuplicateAssets(assets));
+				setClientAssets(clientAssets);
+			} catch (err) {
+				console.log(err);
+			}
+		})();
 	}, [perpClients]);
 
 	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string): Promise<void> {
@@ -116,33 +163,76 @@ export default function AccountDashboard() {
 
 	//IN = into main account from Account
 	//OUT = into subaccoutn from main account
-	async function transferAssetsInternally(amount: string, coin: string, AccountId: string, direction: "IN" | "OUT") {
-		const mainAccount = perpClients.find((client) => client.type === "main");
-		if (mainAccount === undefined) {
-			return;
+	async function transferAssetsInternally(amount: string, coin: string, fromAccountId: string, toAccountId: string) {
+		try {
+			const mainAccount = perpClients.find((client) => client.type === "main");
+			if (mainAccount === undefined) {
+				return;
+			}
+			const [fromAccountType, toAccountType] = [accounts[fromAccountId].type, accounts[toAccountId].type];
+
+			//if sub to sub, to an extra transfer to the main account first (as direct sub to sub transfers are not supported)
+			if (fromAccountType === AccountType.SUB && toAccountType === AccountType.SUB) {
+				const mainAccountTransfer = await mainAccount.perpClient.postPrivate("/asset/v3/private/transfer/universal-transfer", {
+					transferId: uuidv4(),
+					coin,
+					amount,
+					fromMemberId: fromAccountId,
+					toMemberId: mainAccount.id,
+					fromAccountType: "CONTRACT",
+					toAccountType: "CONTRACT",
+				});
+
+				if (mainAccountTransfer.retMsg === "OK") {
+					const subAccountTransfer = await mainAccount.perpClient.postPrivate("/asset/v3/private/transfer/universal-transfer", {
+						transferId: uuidv4(),
+						coin,
+						amount,
+						fromMemberId: mainAccount.id,
+						toMemberId: toAccountId,
+						fromAccountType: "CONTRACT",
+						toAccountType: "CONTRACT",
+					});
+
+					if (subAccountTransfer.retMsg === "OK") {
+						const clients = await initiateClients(accounts);
+
+						setPerpClients(clients);
+						console.log("TRANSFER!🎉", subAccountTransfer);
+					}
+				}
+			} else {
+				const transfer = await mainAccount.perpClient.postPrivate("/asset/v3/private/transfer/universal-transfer", {
+					transferId: uuidv4(),
+					coin,
+					amount,
+					fromMemberId: fromAccountId,
+					toMemberId: toAccountId,
+					fromAccountType: "CONTRACT",
+					toAccountType: "CONTRACT",
+				});
+
+				if (transfer.retMsg === "OK") {
+					const clients = await initiateClients(accounts);
+
+					setPerpClients(clients);
+				}
+
+				console.log("TRANSFER!🎉", transfer);
+			}
+		} catch (err) {
+			console.log(err);
 		}
-
-		const transfer = await mainAccount.perpClient.postPrivate("/asset/v3/private/transfer/universal-transfer", {
-			transferId: uuidv4(),
-			coin,
-			amount,
-			fromMemberId: direction === "IN" ? AccountId : mainAccount.id,
-			toMemberId: direction === "IN" ? mainAccount.id : AccountId,
-			fromAccountType: "CONTRACT",
-			toAccountType: "CONTRACT",
-		});
-
-		if (transfer.retMsg === "OK") {
-			const clients = await initiateClients(accounts);
-
-			setPerpClients(clients);
-		}
-		console.log("TRANSFER!🎉", transfer);
 	}
 
 	return (
 		<div className="h-screen w-screen bg-gray-50 flex flex-col justify-center">
-			<AssetTransferModal />
+			<AssetTransferModal
+				accounts={accounts}
+				clientAssets={clientAssets}
+				allAssets={allAssets}
+				transferAssetsInternally={transferAssetsInternally}
+			/>
 			<div className="mx-auto max-w-7xl sm:px-6 lg:px-8 bg-white w-full py-10 space-y-5">
 				{Object.keys(clientPositions).length > 0 &&
 					perpClients.map((account, index) => (
@@ -154,7 +244,6 @@ export default function AccountDashboard() {
 							client={account.perpClient}
 							closePosition={closePosition}
 							type={account.type}
-							transferAssetsInternally={transferAssetsInternally}
 						/>
 					))}
 			</div>

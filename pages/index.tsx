@@ -3,27 +3,26 @@
 import { ContractClient, OrderSide } from "bybit-api";
 import { useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import AssetTransferModal from "../components/account-transfer/AssetTransferModal";
 import { Position, PositionTable } from "../components/PositionTable";
-
 
 export enum AccountType {
 	MAIN = "main",
-	SUB = "sub"
+	SUB = "sub",
 }
 
-
-interface SubAccount {
+export interface Account {
 	[accountId: string]: {
 		key: string;
 		secret: string;
-		type: AccountType
+		type: AccountType;
 	};
 }
 
 interface PerpClient {
 	perpClient: ContractClient;
 	id: string;
-	type: AccountType
+	type: AccountType;
 }
 
 interface ClientPositions {
@@ -32,23 +31,23 @@ interface ClientPositions {
 	};
 }
 
-export default function SubAccountDashboard() {
-	const accounts = useMemo(() => {
+export default function AccountDashboard() {
+	const accounts: Account = useMemo(() => {
 		return {
 			"1139313": {
 				key: "VGO4EhQVl6QKdR3ASz",
 				secret: "xZ9nkI81I9uLqoHyKtoQckYxWO0YNYKA9lwl",
-				type: AccountType.MAIN
+				type: AccountType.MAIN,
 			},
 			"1139316": {
 				key: "VSCWAWNSXFGQIKKJMZ",
 				secret: "LVFXFVRQQQTAAFWHSFOAEJRQKYYECFUADFPF",
-				type: AccountType.SUB
+				type: AccountType.SUB,
 			},
 			"1139320": {
 				key: "CDFHLEYPHMHJHGCDQQ",
 				secret: "KREGUSISSNHTNQAESTHDMRRHPIPTXZNVUIQJ",
-				type: AccountType.SUB
+				type: AccountType.SUB,
 			},
 		};
 	}, []);
@@ -56,8 +55,8 @@ export default function SubAccountDashboard() {
 	const [perpClients, setPerpClients] = useState<PerpClient[]>([]);
 	const [clientPositions, setClientPositions] = useState<ClientPositions>({});
 
-	async function initiateClients(accounts: SubAccount): Promise<PerpClient[]> {
-		//initiate the client for each subaccount
+	async function initiateClients(accounts: Account): Promise<PerpClient[]> {
+		//initiate the client for each Account
 		const clients: PerpClient[] = [];
 		Object.keys(accounts).forEach((i) => {
 			const perpClient = new ContractClient({
@@ -115,9 +114,9 @@ export default function SubAccountDashboard() {
 		});
 	}
 
-	//IN = into main account from subaccount
+	//IN = into main account from Account
 	//OUT = into subaccoutn from main account
-	async function transferAssetsInternally(amount: string, coin: string, subAccountId: string, direction: "IN" | "OUT") {
+	async function transferAssetsInternally(amount: string, coin: string, AccountId: string, direction: "IN" | "OUT") {
 		const mainAccount = perpClients.find((client) => client.type === "main");
 		if (mainAccount === undefined) {
 			return;
@@ -127,8 +126,8 @@ export default function SubAccountDashboard() {
 			transferId: uuidv4(),
 			coin,
 			amount,
-			fromMemberId: direction === "IN" ? subAccountId : mainAccount.id,
-			toMemberId: direction === "IN" ? mainAccount.id : subAccountId,
+			fromMemberId: direction === "IN" ? AccountId : mainAccount.id,
+			toMemberId: direction === "IN" ? mainAccount.id : AccountId,
 			fromAccountType: "CONTRACT",
 			toAccountType: "CONTRACT",
 		});
@@ -143,6 +142,7 @@ export default function SubAccountDashboard() {
 
 	return (
 		<div className="h-screen w-screen bg-gray-50 flex flex-col justify-center">
+			<AssetTransferModal />
 			<div className="mx-auto max-w-7xl sm:px-6 lg:px-8 bg-white w-full py-10 space-y-5">
 				{Object.keys(clientPositions).length > 0 &&
 					perpClients.map((account, index) => (

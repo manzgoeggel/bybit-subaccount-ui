@@ -62,7 +62,6 @@ export default function SubAccountDashboard() {
 			});
 			clientPositions[client.id] = { positions: positions.result.list };
 		}
-		console.log("hit");
 		return clientPositions;
 	}
 

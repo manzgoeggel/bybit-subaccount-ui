@@ -1,5 +1,5 @@
+import { ContractClient, OrderSide } from "bybit-api";
 import { useMemo } from "react";
-
 export interface Position {
     positionIdx: number;
     riskId: number;
@@ -38,10 +38,26 @@ export interface Position {
     subAccountId: string;
     positions: Position[];
     colorIndex: number;
+    closePosition: (client: ContractClient, symbol: string, side: OrderSide, qty: string) => void;
+    client: ContractClient
   }
   
-  export function PositionTable({subAccountId, positions, colorIndex}:PositionTableProps) {
+  export function PositionTable({subAccountId, positions, colorIndex, closePosition, client}:PositionTableProps) {
     const colors = ["blue", "purple", "green", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose"];
+    const sortedPositions: Position[] = useMemo(() => {
+        return positions.sort((a, b) => {
+            const valueA = Number(a.positionValue);
+            const valueB = Number(b.positionValue);
+            if (valueA > valueB) {
+              return -1;
+            }
+            if (valueA < valueB) {
+              return 1;
+            }
+            return 0;
+          });
+
+    }, [positions]);
     const chosenIndex = useMemo(() => {
 
         if (colorIndex > colors.length) {
@@ -122,7 +138,7 @@ export interface Position {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {positions.map((position) => (
+                    {sortedPositions.map((position) => (
                       <tr key={position.symbol} className="hover:bg-gray-50 transition-all duration-150 ease-in cursor-pointer">
                         <td className="whitespace-nowrap py-2 pl-4 pr-3 text-xs text-gray-900 sm:pl-6 font-medium">
                           {position.symbol}
@@ -137,9 +153,9 @@ export interface Position {
                         <td className={`whitespace-nowrap px-2 py-2 text-xs ${Number(position.unrealisedPnl) < 0 ? "text-red-500" : "text-green-500"}`}>${position.unrealisedPnl}</td>
                         <td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.avgPrice}</td>
                         <td className="relative whitespace-nowrap py-2 pl-3 pr-4 text-right text-xs font-medium sm:pr-6">
-                          <a href="#" className="text-indigo-600 hover:text-indigo-900">
+                          <div onClick={() => {closePosition(client, position.symbol, position.side.toLowerCase() === "sell" ? "Buy" : "Sell",position.size)}} className="text-indigo-600 hover:text-indigo-900">
                             Close position
-                          </a>
+                          </div>
                         </td>
                       </tr>
                     ))}

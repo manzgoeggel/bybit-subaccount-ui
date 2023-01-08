@@ -1,6 +1,6 @@
 // import { ContractClient } from "bybit-api";
 
-import { ContractClient } from "bybit-api";
+import { ContractClient, OrderSide } from "bybit-api";
 import { useEffect, useMemo, useState } from "react";
 import { Position, PositionTable } from "../components/PositionTable";
 
@@ -89,6 +89,16 @@ export default function SubAccountDashboard() {
 		return () => clearInterval(id);
 	}, [perpClients]);
 
+	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string): Promise<void> {
+      await client.submitOrder({
+			symbol,
+			side,
+			orderType: "Market",
+			qty,
+			timeInForce: "FillOrKill",
+		});
+	}
+
 	return (
 		<div className="h-screen w-screen bg-gray-50 flex flex-col justify-center">
 			<div className="mx-auto max-w-7xl sm:px-6 lg:px-8 bg-white w-full py-10 space-y-5">
@@ -99,6 +109,8 @@ export default function SubAccountDashboard() {
 							subAccountId={account.id}
 							positions={clientPositions[account.id].positions}
 							colorIndex={index}
+							client={account.perpClient}
+							closePosition={closePosition}
 						/>
 					))}
 			</div>

@@ -41,7 +41,7 @@ interface PositionTableProps {
 	colorIndex: number;
 	closePosition: (client: ContractClient, symbol: string, side: OrderSide, qty: string) => void;
 	client: ContractClient;
-	type: AccountType
+	type: AccountType;
 }
 
 export interface Asset {
@@ -60,16 +60,8 @@ export interface Asset {
 	accountIM: string;
 	accountMM: string;
 }
-
-export function PositionTable({
-	accountId,
-	positions,
-	colorIndex,
-	closePosition,
-	client,
-	type,
-}: PositionTableProps) {
-	const colors = ["blue", "purple", "green", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose"];
+export const colors = ["blue", "purple", "green", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose"];
+export function PositionTable({ accountId, positions, colorIndex, closePosition, client, type }: PositionTableProps) {
 	const [assets, setAssets] = useState<Asset[]>([]);
 	const sortedPositions: Position[] = useMemo(() => {
 		if (positions !== undefined && positions.length > 0) {
@@ -85,7 +77,7 @@ export function PositionTable({
 				return 0;
 			});
 		}
-    return [];
+		return [];
 	}, [positions]);
 	const chosenIndex = useMemo(() => {
 		if (colorIndex > colors.length) {
@@ -106,7 +98,6 @@ export function PositionTable({
 						}
 					});
 					setAssets(assets_);
-
 				}
 			} catch (err) {
 				console.log(err);
@@ -125,21 +116,19 @@ export function PositionTable({
 					</span>
 
 					<div>
-						<div> available derivative balances</div>
+						<div className="text-gray-600 text-xs py-2">Available derivative balances:</div>
 						{assets.length > 0 ? (
-							<div className="flex flex-col space-y-2">
+							<div className="flex flex-col space-y-2 text-gray-800">
 								{assets.map((asset) => (
 									<div key={asset.coin} className="flex space-x-4 text-xs">
 										<div>
 											{asset.coin}: {asset.availableBalance}
 										</div>
-
-						
 									</div>
 								))}
 							</div>
 						) : (
-							<div>no assets found in derivatives</div>
+							<div className="text-gray-600 text-xs py-2">no assets found in derivatives</div>
 						)}
 					</div>
 				</div>
@@ -192,7 +181,7 @@ export function PositionTable({
 												{position.side}
 											</td>
 											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">{position.size}</td>
-											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.positionValue}</td>
+											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${Number(position.positionValue).toFixed(2)}</td>
 											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.liqPrice}</td>
 											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.markPrice}</td>
 											<td
@@ -200,7 +189,7 @@ export function PositionTable({
 													Number(position.unrealisedPnl) < 0 ? "text-red-500" : "text-green-500"
 												}`}
 											>
-												${position.unrealisedPnl}
+												${Number(position.unrealisedPnl).toFixed(2)}
 											</td>
 											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.avgPrice}</td>
 											<td className="relative whitespace-nowrap py-2 pl-3 pr-4 text-right text-xs font-medium sm:pr-6">

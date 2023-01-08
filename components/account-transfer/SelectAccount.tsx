@@ -1,8 +1,8 @@
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { Fragment } from "react";
-
-import { Account, AccountType } from "../../pages/index";
+import { Account } from "../../pages/index";
+import { colors } from "../PositionTable";
 
 function classNames(...classes: string[]) {
 	return classes.filter(Boolean).join(" ");
@@ -23,6 +23,7 @@ export default function SelectAccount({
 	setSelectedAccount,
 	selectedAccountTwo,
 }: SelectAccountProps) {
+	console.log("color", colors[Object.keys(accounts).indexOf(selectedAccount)]);
 	return (
 		<Listbox
 			value={selectedAccount}
@@ -44,10 +45,10 @@ export default function SelectAccount({
 								{selectedAccount.length > 0 && (
 									<span
 										className={`inline-flex items-center rounded ${
-											accounts[selectedAccount].type === AccountType.MAIN ? "bg-blue-100" : "bg-fuchsia-100"
-										} px-2 py-0.5 w-12 text-center flex justify-center text-xs font-medium ${
-											accounts[selectedAccount].type === AccountType.MAIN ? "text-blue-800" : "text-fuchsia-800"
-										}`}
+											"bg-" + colors[Object.keys(accounts).indexOf(selectedAccount)] + "-100"
+										} ${
+											"text-" + colors[Object.keys(accounts).indexOf(selectedAccount)] + "-800"
+										} px-2 py-0.5 w-12 text-center flex justify-center text-xs font-medium `}
 									>
 										{accounts[selectedAccount].type}
 									</span>
@@ -61,7 +62,7 @@ export default function SelectAccount({
 						<Transition show={open} as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
 							<Listbox.Options className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
 								{accounts !== undefined &&
-									Object.keys(accounts).map((accountId) => (
+									Object.keys(accounts).map((accountId, index) => (
 										<Listbox.Option
 											key={accountId}
 											className={({ active }) =>
@@ -80,11 +81,9 @@ export default function SelectAccount({
 															{accountId}
 														</span>
 														<span
-															className={`inline-flex items-center rounded ${
-																accounts[accountId].type === AccountType.MAIN ? "bg-blue-100" : "bg-fuchsia-100"
-															} px-2 py-0.5 w-12 text-center flex justify-center text-xs font-medium ${
-																accounts[accountId].type === AccountType.MAIN ? "text-blue-800" : "text-fuchsia-800"
-															}`}
+															className={`inline-flex items-center rounded  px-2 py-0.5 w-12 text-center flex justify-center text-xs font-medium ${
+																"bg-" + colors[index] + "-100"
+															} ${"text-" + colors[index] + "-800"} `}
 														>
 															{accounts[accountId].type}
 														</span>

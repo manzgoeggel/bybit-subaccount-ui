@@ -23,7 +23,6 @@ export default function SelectAccount({
 	setSelectedAccount,
 	selectedAccountTwo,
 }: SelectAccountProps) {
-	console.log("color", colors[Object.keys(accounts).indexOf(selectedAccount)]);
 	return (
 		<Listbox
 			value={selectedAccount}

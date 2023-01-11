@@ -39,9 +39,10 @@ interface PositionTableProps {
 	accountId: string;
 	positions: Position[];
 	colorIndex: number;
-	closePosition: (client: ContractClient, symbol: string, side: OrderSide, qty: string) => void;
+	closePosition: (client: ContractClient, symbol: string, side: OrderSide, qty: string, accountId: string) => void;
 	client: ContractClient;
 	type: AccountType;
+	disabledPositions: string[];
 }
 
 export interface Asset {
@@ -60,8 +61,8 @@ export interface Asset {
 	accountIM: string;
 	accountMM: string;
 }
-export const colors = ["blue", "purple", "green", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose"];
-export function PositionTable({ accountId, positions, colorIndex, closePosition, client, type }: PositionTableProps) {
+export const colors = ["blue", "purple", "green", "violet", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose", "yellow", "cyan", "red","indigo", "gray", "emerald", "orange", "blue", "rose", "green"];
+export function PositionTable({ accountId, positions, colorIndex, closePosition, client, type, disabledPositions }: PositionTableProps) {
 	const [assets, setAssets] = useState<Asset[]>([]);
 	const sortedPositions: Position[] = useMemo(() => {
 		if (positions !== undefined && positions.length > 0) {
@@ -100,7 +101,6 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 					setAssets(assets_);
 				}
 			} catch (err) {
-				console.log(err);
 			}
 		})();
 	}, [client]);
@@ -128,7 +128,7 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 								))}
 							</div>
 						) : (
-							<div className="text-gray-600 text-xs py-2">no assets found in derivatives</div>
+							<div className="text-gray-400 text-xs py-2">no assets found in derivatives</div>
 						)}
 					</div>
 				</div>
@@ -170,40 +170,56 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-gray-200 bg-white">
-									{sortedPositions.map((position) => (
-										<tr key={position.symbol} className="hover:bg-gray-50 transition-all duration-150 ease-in cursor-pointer">
-											<td className="whitespace-nowrap py-2 pl-4 pr-3 text-xs text-gray-900 sm:pl-6 font-medium">{position.symbol}</td>
-											<td
-												className={`whitespace-nowrap px-2 py-2 text-xs font-medium  ${
-													position.side.toLowerCase() === "sell" ? "text-red-500" : "text-green-500"
-												}`}
-											>
-												{position.side}
-											</td>
-											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">{position.size}</td>
-											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${Number(position.positionValue).toFixed(2)}</td>
-											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.liqPrice}</td>
-											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.markPrice}</td>
-											<td
-												className={`whitespace-nowrap px-2 py-2 text-xs ${
-													Number(position.unrealisedPnl) < 0 ? "text-red-500" : "text-green-500"
-												}`}
-											>
-												${Number(position.unrealisedPnl).toFixed(2)}
-											</td>
-											<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.avgPrice}</td>
-											<td className="relative whitespace-nowrap py-2 pl-3 pr-4 text-right text-xs font-medium sm:pr-6">
-												<div
-													onClick={() => {
-														closePosition(client, position.symbol, position.side.toLowerCase() === "sell" ? "Buy" : "Sell", position.size);
-													}}
-													className="text-indigo-600 hover:text-indigo-900"
-												>
-													Close position
-												</div>
-											</td>
-										</tr>
-									))}
+									{sortedPositions.length > 0 ? (
+										<>
+											{sortedPositions.map((position) => (
+												<tr key={position.symbol} className="hover:bg-gray-50 transition-all duration-150 ease-in cursor-pointer">
+													<td className="whitespace-nowrap py-2 pl-4 pr-3 text-xs text-gray-900 sm:pl-6 font-medium">{position.symbol}</td>
+													<td
+														className={`whitespace-nowrap px-2 py-2 text-xs font-medium  ${
+															position.side.toLowerCase() === "sell" ? "text-red-500" : "text-green-500"
+														}`}
+													>
+														{position.side}
+													</td>
+													<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">{position.size}</td>
+													<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">
+														${Number(position.positionValue).toFixed(2)}
+													</td>
+													<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.liqPrice}</td>
+													<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.markPrice}</td>
+													<td
+														className={`whitespace-nowrap px-2 py-2 text-xs ${
+															Number(position.unrealisedPnl) < 0 ? "text-red-500" : "text-green-500"
+														}`}
+													>
+														${Number(position.unrealisedPnl).toFixed(2)}
+													</td>
+													<td className="whitespace-nowrap px-2 py-2 text-xs text-gray-500">${position.avgPrice}</td>
+													<td className="relative whitespace-nowrap py-2 pl-3 pr-4 text-right text-xs font-medium sm:pr-6">
+														<button
+															onClick={() => {
+																closePosition(
+																	client,
+																	position.symbol,
+																	position.side.toLowerCase() === "sell" ? "Buy" : "Sell",
+																	position.size,
+																	accountId
+
+																);
+															}}
+															disabled={disabledPositions.includes(position.symbol + position.size + accountId)}
+															className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-none focus:outline-none"
+														>
+															Close position
+														</button>
+													</td>
+												</tr>
+											))}
+										</>
+									) : (
+										<div className="flex w-full text-gray-600 text-xs justify-center py-2">no open positions found</div>
+									)}
 								</tbody>
 							</table>
 						</div>

@@ -31,7 +31,6 @@ export default function AssetTransferModal({
 
 	useEffect(() => {
 		if (allAssets !== undefined && allAssets.length > 0) {
-			console.log("coin", allAssets[0]);
 			setSelectedAsset(allAssets[0]);
 		}
 	}, [allAssets]);

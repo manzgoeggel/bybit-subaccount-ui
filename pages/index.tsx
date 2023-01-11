@@ -1,11 +1,13 @@
-// import { ContractClient } from "bybit-api";
-
 import { ContractClient, OrderSide } from "bybit-api";
-import { useEffect, useMemo, useState } from "react";
-import { useKeyPress } from "react-use";
+import { useEffect, useState } from "react";
+import { useKeyPress, useLocalStorage } from "react-use";
 import { v4 as uuidv4 } from "uuid";
 import AssetTransferModal from "../components/account-transfer/AssetTransferModal";
+import DropZoneModal from "../components/DropZone";
 import { Asset, Position, PositionTable } from "../components/PositionTable";
+
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 export enum AccountType {
 	MAIN = "main",
 	SUB = "sub",
@@ -38,26 +40,6 @@ export interface ClientAssets {
 }
 
 export default function AccountDashboard() {
-	const accounts: Account = useMemo(() => {
-		return {
-			"1139313": {
-				key: "VGO4EhQVl6QKdR3ASz",
-				secret: "xZ9nkI81I9uLqoHyKtoQckYxWO0YNYKA9lwl",
-				type: AccountType.MAIN,
-			},
-			"1139316": {
-				key: "VSCWAWNSXFGQIKKJMZ",
-				secret: "LVFXFVRQQQTAAFWHSFOAEJRQKYYECFUADFPF",
-				type: AccountType.SUB,
-			},
-			"1139320": {
-				key: "CDFHLEYPHMHJHGCDQQ",
-				secret: "KREGUSISSNHTNQAESTHDMRRHPIPTXZNVUIQJ",
-				type: AccountType.SUB,
-			},
-		};
-	}, []);
-
 	const [perpClients, setPerpClients] = useState<PerpClient[]>([]);
 	const [clientPositions, setClientPositions] = useState<ClientPositions>({});
 	const [clientAssets, setClientAssets] = useState<ClientAssets>({});
@@ -65,6 +47,10 @@ export default function AccountDashboard() {
 	const [openTransferModal, setOpenTransferModal] = useState(false);
 	const isCmdKPressed = useKeyPress((e) => e.metaKey && e.key === "k");
 
+	// const [accounts, setAccounts] = useState<Account>({});
+	const [accounts, setAccounts, remove] = useLocalStorage<Account>("accounts", {});
+	const [open, setOpen] = useState(false);
+	const [disabledPositions, setDisabledPositions] = useState([""]);
 
 	async function initiateClients(accounts: Account): Promise<PerpClient[]> {
 		//initiate the client for each Account
@@ -101,67 +87,6 @@ export default function AccountDashboard() {
 				seenCoins.add(asset.coin);
 				return true;
 			}
-		});
-	}
-
-	useEffect(() => {
-		(async () => {
-			try {
-				const clients = await initiateClients(accounts);
-
-				setPerpClients(clients);
-			} catch (err) {
-				console.log(err);
-			}
-		})();
-	}, [accounts]);
-
-	useEffect(() => {
-		const id = setInterval(async () => {
-			const positions = await getAllPositions(perpClients);
-			setClientPositions(positions);
-		}, 1000);
-
-		return () => clearInterval(id);
-	}, [perpClients]);
-
-	//get all derivative assets over > 0, for each client
-	useEffect(() => {
-		(async () => {
-			try {
-				let clientAssets = {};
-				let assets: Asset[] = [];
-				for await (const client of Object.keys(perpClients)) {
-					const { id, perpClient } = perpClients[client];
-
-					const response = await perpClient.getBalances();
-
-					if (response.result.list.length > 0) {
-						const assets_ = response.result.list.filter((asset: Asset) => {
-							if (Number(asset.equity) > 0) {
-								return asset;
-							}
-						});
-						clientAssets[id] = assets_;
-						assets = [...assets, ...assets_];
-					}
-				}
-				console.log("test", filterDuplicateAssets(assets));
-				setAllAssets(filterDuplicateAssets(assets));
-				setClientAssets(clientAssets);
-			} catch (err) {
-				console.log(err);
-			}
-		})();
-	}, [perpClients]);
-
-	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string): Promise<void> {
-		await client.submitOrder({
-			symbol,
-			side,
-			orderType: "Market",
-			qty,
-			timeInForce: "FillOrKill",
 		});
 	}
 
@@ -221,13 +146,144 @@ export default function AccountDashboard() {
 
 					setPerpClients(clients);
 				}
-
-				console.log("TRANSFER!🎉", transfer);
+				toast.success(`Successfully transferred ${amount} ${coin} from account ${fromAccountId} to ${toAccountId}.`, {
+					position: toast.POSITION.BOTTOM_RIGHT,
+				});
 			}
 		} catch (err) {
-			console.log(err);
+			toast.error(`Error: ${err.message}`, {
+				position: toast.POSITION.BOTTOM_RIGHT,
+			});
 		}
 	}
+	useEffect(() => {
+		if (!accounts || Object.keys(accounts).length === 0) {
+			setOpen(true);
+		}
+	}, [accounts]);
+
+	// useEffect(() => {
+	// 	if (mainAccount) {
+	// 		(async () => {
+	// 			try {
+	// 				const key = Object.keys(mainAccount)[0];
+	// 				const masterClient = new ContractClient({
+	// 					key: mainAccount[key].key,
+	// 					secret: mainAccount[key].secret,
+	// 					strict_param_validation: false,
+	// 					testnet: true,
+	// 				});
+
+	// 				//get all subAccounts
+	// 				const result = await masterClient.getPrivate("/user/v3/private/query-sub-members");
+	// 				console.log("SUBACCOUNTS", result);
+	// 				let subAccounts_: Account = {};
+	// 				//create an API key for each subaccount
+	// 				for await (const subAccount of result.result.subMembers) {
+	// 					const { subUid, apiKey, secret } = await createNewSubAccountAPIkey(
+	// 						subAccount.uid,
+	// 						mainAccount[key].secret,
+	// 						mainAccount[key].key
+	// 					);
+
+	// 					subAccounts_[subUid] = {
+	// 						key: apiKey,
+	// 						secret,
+	// 						type: AccountType.SUB,
+	// 					};
+	// 				}
+	// 				console.log("subaccounts:", subAccounts_);
+	// 				setAccounts(subAccounts_);
+	// 			} catch (err) {
+	// 				console.log(err);
+	// 			}
+	// 		})();
+	// 	}
+	// }, [mainAccount]);
+
+	useEffect(() => {
+		if (accounts && Object.keys(accounts).length > 0) {
+			(async () => {
+				try {
+					const clients = await initiateClients(accounts);
+					setPerpClients(clients);
+				} catch (err) {
+					console.log(err);
+				}
+			})();
+		}
+	}, [accounts]);
+
+	useEffect(() => {
+		(async () => {
+			const id = toast.loading(`Fetching positions...`, {
+				position: toast.POSITION.BOTTOM_RIGHT,
+			});
+			const positions = await getAllPositions(perpClients);
+			toast.update(id, { render: "fetched positions succesfully.", type: "success", isLoading: false });
+			toast.dismiss(id);
+			setClientPositions(positions);
+		})();
+		const id = setInterval(async () => {
+			const positions = await getAllPositions(perpClients);
+			setClientPositions(positions);
+		}, 2500);
+
+		return () => clearInterval(id);
+	}, [perpClients]);
+
+	//get all derivative assets over > 0, for each client
+	useEffect(() => {
+		(async () => {
+			try {
+				let clientAssets = {};
+				let assets: Asset[] = [];
+				for await (const client of Object.keys(perpClients)) {
+					const { id, perpClient } = perpClients[client];
+
+					const response = await perpClient.getBalances();
+					console.log("RESPONSE", response);
+					if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
+						console.log(response.result.list);
+						const assets_ = response.result.list.filter((asset: Asset) => {
+							if (Number(asset.equity) > 0) {
+								return asset;
+							}
+						});
+						clientAssets[id] = assets_;
+						assets = [...assets, ...assets_];
+					}
+				}
+				setAllAssets(filterDuplicateAssets(assets));
+				setClientAssets(clientAssets);
+			} catch (err) {
+				console.log(err);
+			}
+		})();
+	}, [perpClients]);
+
+	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string, accountId: string): Promise<void> {
+		const tradeUid = symbol + qty + accountId;
+		setDisabledPositions((positions) => [...positions, tradeUid]);
+		toast.promise(
+			client.submitOrder({
+				symbol,
+				side,
+				orderType: "Market",
+				qty,
+				timeInForce: "FillOrKill",
+			}),
+			{
+				pending: "Order submited.",
+				success: `Successfully ${side === "Buy" ? "bought" : "sold"} ${qty} ${symbol}!`,
+				error: "Oops, something went wrong.",
+			}
+		);
+		const positions = await getAllPositions(perpClients);
+		setClientPositions(positions);
+		setDisabledPositions((positions_) => positions_.filter((i) => i !== tradeUid));
+	}
+
 	useEffect(() => {
 		if (isCmdKPressed[0]) {
 			if (!openTransferModal) {
@@ -238,7 +294,20 @@ export default function AccountDashboard() {
 		}
 	}, [isCmdKPressed]);
 	return (
-		<div className="h-screen w-screen bg-gray-50 flex flex-col justify-center">
+		<div className="min-h-screen w-screen bg-gray-50 flex flex-col justify-center">
+			<ToastContainer
+				position="bottom-right"
+				autoClose={2000}
+				hideProgressBar={false}
+				newestOnTop={false}
+				closeOnClick
+				rtl={false}
+				pauseOnFocusLoss
+				draggable
+				pauseOnHover
+				theme="light"
+			/>
+			<DropZoneModal open={open} setOpen={setOpen} accounts={accounts} setAccounts={setAccounts} />
 			<AssetTransferModal
 				accounts={accounts}
 				clientAssets={clientAssets}
@@ -247,7 +316,29 @@ export default function AccountDashboard() {
 				open={openTransferModal}
 				setOpen={setOpenTransferModal}
 			/>
+
 			<div className="mx-auto max-w-7xl sm:px-6 lg:px-8 bg-white w-full py-10 space-y-5">
+				<div className="border-b border-gray-200 bg-white px-4 py-5 sm:px-6">
+					<div className="-ml-4 -mt-4 flex flex-wrap items-center justify-between sm:flex-nowrap">
+						<div className="ml-4 mt-4">
+							<h3 className="text-lg font-medium leading-6 text-gray-900">Manage your Bybit subaccounts</h3>
+							<p className="mt-1 text-sm text-gray-500">
+								Transfer assets between subaccounts & manage positions. Press "CMD + K" to quickly transfer assets.
+							</p>
+						</div>
+						<div className="ml-4 mt-4 flex-shrink-0">
+							<button
+								onClick={() => {
+									setOpenTransferModal(true);
+								}}
+								type="button"
+								className="relative inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-150 ease-in"
+							>
+								Transfer assets
+							</button>
+						</div>
+					</div>
+				</div>
 				{Object.keys(clientPositions).length > 0 &&
 					perpClients.map((account, index) => (
 						<PositionTable
@@ -258,6 +349,7 @@ export default function AccountDashboard() {
 							client={account.perpClient}
 							closePosition={closePosition}
 							type={account.type}
+							disabledPositions={disabledPositions}
 						/>
 					))}
 			</div>

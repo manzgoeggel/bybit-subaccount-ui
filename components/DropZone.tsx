@@ -22,6 +22,13 @@ export default function DropZoneModal({ accounts, setAccounts, open, setOpen }: 
 			reader.onload = () => {
 				// Do whatever you want with the file contents
 				// const x = String.fromCharCode.apply(null, new Uint8Array(reader.result))
+				if (!reader.result) {
+					toast.error(`Oops, something went wrong.`, {
+						position: toast.POSITION.BOTTOM_RIGHT,
+					});
+					return;
+				}
+				//@ts-ignore
 				const parsedFile = JSON.parse(new TextDecoder().decode(reader.result));
 
 				if (Object.keys(parsedFile).length > 0) {

@@ -9,7 +9,7 @@ function classNames(...classes: string[]) {
 }
 
 interface SelectAccountProps {
-	accounts?: Account;
+	accounts: Account;
 	description: string;
 	selectedAccount: string;
 	setSelectedAccount: (value: string) => void;
@@ -72,7 +72,7 @@ export default function SelectAccount({
 											}
 											value={accountId}
 										>
-											{({ selectedAccount, active }) => (
+											{({ selectedAccount, active }: any) => (
 												<>
 													<div className="flex items-center justify-between pr-2">
 														{/* <img src={person.avatar} alt="" className="h-6 w-6 flex-shrink-0 rounded-full" /> */}

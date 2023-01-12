@@ -93,6 +93,9 @@ export default function AccountDashboard() {
 	//IN = into main account from Account
 	//OUT = into subaccoutn from main account
 	async function transferAssetsInternally(amount: string, coin: string, fromAccountId: string, toAccountId: string) {
+		if (!accounts) {
+			return;
+		}
 		try {
 			const mainAccount = perpClients.find((client) => client.type === "main");
 			if (mainAccount === undefined) {
@@ -150,7 +153,7 @@ export default function AccountDashboard() {
 					position: toast.POSITION.BOTTOM_RIGHT,
 				});
 			}
-		} catch (err) {
+		} catch (err: any) {
 			toast.error(`Error: ${err.message}`, {
 				position: toast.POSITION.BOTTOM_RIGHT,
 			});
@@ -161,45 +164,6 @@ export default function AccountDashboard() {
 			setOpen(true);
 		}
 	}, [accounts]);
-
-	// useEffect(() => {
-	// 	if (mainAccount) {
-	// 		(async () => {
-	// 			try {
-	// 				const key = Object.keys(mainAccount)[0];
-	// 				const masterClient = new ContractClient({
-	// 					key: mainAccount[key].key,
-	// 					secret: mainAccount[key].secret,
-	// 					strict_param_validation: false,
-	// 					testnet: true,
-	// 				});
-
-	// 				//get all subAccounts
-	// 				const result = await masterClient.getPrivate("/user/v3/private/query-sub-members");
-	// 				console.log("SUBACCOUNTS", result);
-	// 				let subAccounts_: Account = {};
-	// 				//create an API key for each subaccount
-	// 				for await (const subAccount of result.result.subMembers) {
-	// 					const { subUid, apiKey, secret } = await createNewSubAccountAPIkey(
-	// 						subAccount.uid,
-	// 						mainAccount[key].secret,
-	// 						mainAccount[key].key
-	// 					);
-
-	// 					subAccounts_[subUid] = {
-	// 						key: apiKey,
-	// 						secret,
-	// 						type: AccountType.SUB,
-	// 					};
-	// 				}
-	// 				console.log("subaccounts:", subAccounts_);
-	// 				setAccounts(subAccounts_);
-	// 			} catch (err) {
-	// 				console.log(err);
-	// 			}
-	// 		})();
-	// 	}
-	// }, [mainAccount]);
 
 	useEffect(() => {
 		if (accounts && Object.keys(accounts).length > 0) {
@@ -236,13 +200,14 @@ export default function AccountDashboard() {
 	useEffect(() => {
 		(async () => {
 			try {
-				let clientAssets = {};
+				let clientAssets: ClientAssets = {};
 				let assets: Asset[] = [];
-				for await (const client of Object.keys(perpClients)) {
-					const { id, perpClient } = perpClients[client];
+				console.log("PERPS", perpClients);
+				for await (const client of perpClients) {
+					const { id, perpClient } = client;
 
 					const response = await perpClient.getBalances();
-					console.log("RESPONSE", response);
+
 					if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
 						console.log(response.result.list);
 						const assets_ = response.result.list.filter((asset: Asset) => {
@@ -250,8 +215,10 @@ export default function AccountDashboard() {
 								return asset;
 							}
 						});
+
 						clientAssets[id] = assets_;
 						assets = [...assets, ...assets_];
+						console.log("RESPONSE", clientAssets);
 					}
 				}
 				setAllAssets(filterDuplicateAssets(assets));
@@ -307,9 +274,9 @@ export default function AccountDashboard() {
 				pauseOnHover
 				theme="light"
 			/>
-			<DropZoneModal open={open} setOpen={setOpen} accounts={accounts} setAccounts={setAccounts} />
+			<DropZoneModal open={open} setOpen={setOpen} accounts={accounts || {}} setAccounts={setAccounts} />
 			<AssetTransferModal
-				accounts={accounts}
+				accounts={accounts || {}}
 				clientAssets={clientAssets}
 				allAssets={allAssets}
 				transferAssetsInternally={transferAssetsInternally}
@@ -323,7 +290,7 @@ export default function AccountDashboard() {
 						<div className="ml-4 mt-4">
 							<h3 className="text-lg font-medium leading-6 text-gray-900">Manage your Bybit subaccounts</h3>
 							<p className="mt-1 text-sm text-gray-500">
-								Transfer assets between subaccounts & manage positions. Press "CMD + K" to quickly transfer assets.
+								Transfer assets between subaccounts & manage positions. Press {`"`}CMD + K{`"`} to quickly transfer assets.
 							</p>
 						</div>
 						<div className="ml-4 mt-4 flex-shrink-0">

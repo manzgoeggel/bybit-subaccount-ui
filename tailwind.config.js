@@ -7,7 +7,12 @@ module.exports = {
 		},
 	],
 	theme: {
-		extend: {},
+
+		extend: {
+			fontSize: {
+				tiny: "0.6rem"
+			}
+		},
 	},
 	plugins: [require("@tailwindcss/forms")],
 };

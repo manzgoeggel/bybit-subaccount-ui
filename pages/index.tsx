@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import AssetTransferModal from "../components/account-transfer/AssetTransferModal";
 import DropZoneModal from "../components/DropZone";
 import { Asset, Position, PositionTable } from "../components/PositionTable";
-
+import OrderSlideOver from "../components/order/OrderSlideOver";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 export enum AccountType {
@@ -228,105 +228,6 @@ export default function AccountDashboard() {
 		return () => clearInterval(id);
 	}, [perpClients]);
 
-	// useEffect(() => {
-	// 	(async () => {
-	// 		const logger = {
-	// 			...DefaultLogger,
-	// 			silly: () => {},
-	// 		};
-
-	// 		const key = "VGO4EhQVl6QKdR3ASz";
-	// 		const secret = "xZ9nkI81I9uLqoHyKtoQckYxWO0YNYKA9lwl";
-
-	// 		const market = "contractUSDT";
-	// 		const wsClient = new WebsocketClient(
-	// 			{
-	// 				key: key,
-	// 				secret: secret,
-	// 				market: market,
-	// 				// testnet: true,
-	// 				restOptions: {
-	// 					// enable_time_sync: true,
-	// 				},
-	// 			},
-	// 			logger
-	// 		);
-
-	// 		wsClient.on("update", (data) => {
-	// 			console.log("raw message received ", JSON.stringify(data, null, 2));
-	// 		});
-
-	// 		wsClient.on("open", (data) => {
-	// 			console.log("connection opened open:", data.wsKey);
-	// 		});
-	// 		wsClient.on("response", (data) => {
-	// 			console.log("ws response: ", JSON.stringify(data, null, 2));
-	// 		});
-	// 		wsClient.on("reconnect", ({ wsKey }) => {
-	// 			console.log("ws automatically reconnecting.... ", wsKey);
-	// 		});
-	// 		wsClient.on("reconnected", (data) => {
-	// 			console.log("ws has reconnected ", data?.wsKey);
-	// 		});
-	// 		wsClient.on("error", (data) => {
-	// 			console.error("ws exception: ", data);
-	// 		});
-
-	// 		// subscribe to private endpoints
-	// 		// check the api docs in your api category to see the available topics
-	// 		// wsClient.subscribe(['position', 'execution', 'order', 'wallet']);
-
-	// 		// Contract v3
-	// 		wsClient.subscribe([
-	// 			"user.position.contractAccount",
-	// 			"user.execution.contractAccount",
-	// 			"user.order.contractAccount",
-	// 			"user.wallet.contractAccount",
-	// 		]);
-	// 	})();
-	// }, []);
-
-	//get all derivative assets over > 0, for each client
-	// useEffect(() => {
-	// 	console.log("hit")
-	// 	if (isLoading) {
-	// 		return;
-	// 	}
-
-	// 	setIsLoading(true);
-	// 	(async () => {
-	// 		try {
-	// 			let clientAssets: ClientAssets = {};
-	// 			let assets: Asset[] = [];
-
-	// 			for await (const client of perpClients) {
-	// 				const { id, perpClient } = client;
-
-	// 				const response = await perpClient.getBalances();
-	// 				console.log("RES", response, perpClient);
-	// 				if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
-	// 					console.log(response.result.list);
-	// 					const assets_ = response.result.list.filter((asset: Asset) => {
-	// 						if (Number(asset.equity) > 0) {
-	// 							return asset;
-	// 						}
-	// 					});
-
-	// 					clientAssets[id] = assets_;
-	// 					assets = [...assets, ...assets_];
-	// 					console.log("RESPONSE", clientAssets);
-	// 					setIsLoading(false);
-	// 				}
-	// 			}
-	// 			setAllAssets(filterDuplicateAssets(assets));
-	// 			setClientAssets(clientAssets);
-	// 		} catch (err) {
-	// 			setIsLoading(false);
-	// 			console.log(err);
-	// 		}
-	// 	})();
-	// }, [perpClients, isLoading]);
-
 	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string, accountId: string): Promise<void> {
 		const tradeUid = symbol + qty + accountId;
 		setDisabledPositions((positions) => [...positions, tradeUid]);
@@ -360,6 +261,7 @@ export default function AccountDashboard() {
 	}, [isCmdKPressed, allAssets]);
 	return (
 		<div className="min-h-screen w-screen bg-gray-50 flex flex-col justify-center">
+			<OrderSlideOver />
 			<ToastContainer
 				position="bottom-right"
 				autoClose={2000}

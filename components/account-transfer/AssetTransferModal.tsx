@@ -30,6 +30,7 @@ export default function AssetTransferModal({
 	const [amount, setAmount] = useState("0");
 
 	useEffect(() => {
+		console.log("ASSETS:", allAssets);
 		if (allAssets !== undefined && allAssets.length > 0) {
 			setSelectedAsset(allAssets[0]);
 		}

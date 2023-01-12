@@ -11,7 +11,7 @@ function getSignature(parameters: string, secret: string, apiKey: string) {
 		.digest("hex");
 }
 
-async function http_request(endpoint: string, method: "POST" | "GET", data: string, secret: string, apiKey: string): Promise<any> {
+export async function http_request(endpoint: string, method: "POST" | "GET", data: string, secret: string, apiKey: string): Promise<any> {
 	const sign = getSignature(data, secret, apiKey);
 	let fullendpoint = "";
 	if (method == "POST") {

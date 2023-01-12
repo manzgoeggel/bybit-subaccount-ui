@@ -51,7 +51,7 @@ export default function AccountDashboard() {
 	const [accounts, setAccounts, remove] = useLocalStorage<Account>("accounts", {});
 	const [open, setOpen] = useState(false);
 	const [disabledPositions, setDisabledPositions] = useState([""]);
-
+	const [isLoading, setIsLoading] = useState(false);
 	async function initiateClients(accounts: Account): Promise<PerpClient[]> {
 		//initiate the client for each Account
 		const clients: PerpClient[] = [];
@@ -61,6 +61,7 @@ export default function AccountDashboard() {
 				secret: accounts[i].secret,
 				strict_param_validation: true,
 				testnet: true,
+				recv_window: 5000 * 1000,
 			});
 			clients.push({ perpClient, id: i, type: accounts[i].type });
 		});
@@ -191,43 +192,81 @@ export default function AccountDashboard() {
 		const id = setInterval(async () => {
 			const positions = await getAllPositions(perpClients);
 			setClientPositions(positions);
+
+			(async () => {
+				try {
+					let clientAssets: ClientAssets = {};
+					let assets: Asset[] = [];
+
+					for await (const client of perpClients) {
+						const { id, perpClient } = client;
+
+						const response = await perpClient.getBalances();
+						console.log("RES", response, perpClient);
+						if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
+							console.log(response.result.list);
+							const assets_ = response.result.list.filter((asset: Asset) => {
+								if (Number(asset.equity) > 0) {
+									return asset;
+								}
+							});
+
+							clientAssets[id] = assets_;
+							assets = [...assets, ...assets_];
+							console.log("RESPONSE", clientAssets);
+						}
+					}
+					setAllAssets(filterDuplicateAssets(assets));
+					setClientAssets(clientAssets);
+				} catch (err) {
+					console.log(err);
+				}
+			})();
 		}, 2500);
 
 		return () => clearInterval(id);
 	}, [perpClients]);
 
 	//get all derivative assets over > 0, for each client
-	useEffect(() => {
-		(async () => {
-			try {
-				let clientAssets: ClientAssets = {};
-				let assets: Asset[] = [];
-				console.log("PERPS", perpClients);
-				for await (const client of perpClients) {
-					const { id, perpClient } = client;
+	// useEffect(() => {
+	// 	console.log("hit")
+	// 	if (isLoading) {
+	// 		return;
+	// 	}
 
-					const response = await perpClient.getBalances();
+	// 	setIsLoading(true);
+	// 	(async () => {
+	// 		try {
+	// 			let clientAssets: ClientAssets = {};
+	// 			let assets: Asset[] = [];
 
-					if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
-						console.log(response.result.list);
-						const assets_ = response.result.list.filter((asset: Asset) => {
-							if (Number(asset.equity) > 0) {
-								return asset;
-							}
-						});
+	// 			for await (const client of perpClients) {
+	// 				const { id, perpClient } = client;
 
-						clientAssets[id] = assets_;
-						assets = [...assets, ...assets_];
-						console.log("RESPONSE", clientAssets);
-					}
-				}
-				setAllAssets(filterDuplicateAssets(assets));
-				setClientAssets(clientAssets);
-			} catch (err) {
-				console.log(err);
-			}
-		})();
-	}, [perpClients]);
+	// 				const response = await perpClient.getBalances();
+	// 				console.log("RES", response, perpClient);
+	// 				if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
+	// 					console.log(response.result.list);
+	// 					const assets_ = response.result.list.filter((asset: Asset) => {
+	// 						if (Number(asset.equity) > 0) {
+	// 							return asset;
+	// 						}
+	// 					});
+
+	// 					clientAssets[id] = assets_;
+	// 					assets = [...assets, ...assets_];
+	// 					console.log("RESPONSE", clientAssets);
+	// 					setIsLoading(false);
+	// 				}
+	// 			}
+	// 			setAllAssets(filterDuplicateAssets(assets));
+	// 			setClientAssets(clientAssets);
+	// 		} catch (err) {
+	// 			setIsLoading(false);
+	// 			console.log(err);
+	// 		}
+	// 	})();
+	// }, [perpClients, isLoading]);
 
 	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string, accountId: string): Promise<void> {
 		const tradeUid = symbol + qty + accountId;
@@ -252,14 +291,14 @@ export default function AccountDashboard() {
 	}
 
 	useEffect(() => {
-		if (isCmdKPressed[0]) {
+		if (isCmdKPressed[0] && allAssets.length > 0) {
 			if (!openTransferModal) {
 				setOpenTransferModal(true);
 			} else {
 				setOpenTransferModal(false);
 			}
 		}
-	}, [isCmdKPressed]);
+	}, [isCmdKPressed, allAssets]);
 	return (
 		<div className="min-h-screen w-screen bg-gray-50 flex flex-col justify-center">
 			<ToastContainer
@@ -298,8 +337,9 @@ export default function AccountDashboard() {
 								onClick={() => {
 									setOpenTransferModal(true);
 								}}
+								disabled={allAssets.length === 0}
 								type="button"
-								className="relative inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-150 ease-in"
+								className="relative inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-150 ease-in disabled:opacity-50 disabled:cursor-not-allowed"
 							>
 								Transfer assets
 							</button>

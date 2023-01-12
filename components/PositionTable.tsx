@@ -91,7 +91,7 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 		(async () => {
 			try {
 				const response = await client.getBalances();
-
+				console.log("RES2", response)
 				if (response.result.list.length > 0) {
 					const assets_ = response.result.list.filter((asset: Asset) => {
 						if (Number(asset.equity) > 0) {

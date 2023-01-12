@@ -1,4 +1,4 @@
-import { ContractClient, OrderSide } from "bybit-api";
+import { ContractClient, OrderSide, WebsocketClient, DefaultLogger } from "bybit-api";
 import { useEffect, useState } from "react";
 import { useKeyPress, useLocalStorage } from "react-use";
 import { v4 as uuidv4 } from "uuid";
@@ -179,8 +179,39 @@ export default function AccountDashboard() {
 		}
 	}, [accounts]);
 
+	async function getAllAssets() {
+		try {
+			let clientAssets: ClientAssets = {};
+			let assets: Asset[] = [];
+
+			for await (const client of perpClients) {
+				const { id, perpClient } = client;
+				await new Promise((r) => setTimeout(r, 2000));
+				const response = await perpClient.getBalances();
+				if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
+					console.log(response.result.list);
+					const assets_ = response.result.list.filter((asset: Asset) => {
+						if (Number(asset.equity) > 0) {
+							return asset;
+						}
+					});
+
+					clientAssets[id] = assets_;
+					assets = [...assets, ...assets_];
+					console.log("RESPONSE", clientAssets);
+				}
+			}
+			setAllAssets(filterDuplicateAssets(assets));
+			setClientAssets(clientAssets);
+		} catch (err) {
+			console.log(err);
+		}
+	}
+
 	useEffect(() => {
+		//first one, when initiated
 		(async () => {
+			await getAllAssets();
 			const id = toast.loading(`Fetching positions...`, {
 				position: toast.POSITION.BOTTOM_RIGHT,
 			});
@@ -192,40 +223,68 @@ export default function AccountDashboard() {
 		const id = setInterval(async () => {
 			const positions = await getAllPositions(perpClients);
 			setClientPositions(positions);
-
-			(async () => {
-				try {
-					let clientAssets: ClientAssets = {};
-					let assets: Asset[] = [];
-
-					for await (const client of perpClients) {
-						const { id, perpClient } = client;
-
-						const response = await perpClient.getBalances();
-						console.log("RES", response, perpClient);
-						if (Object.keys(response.result).length > 0 || response.result.list.length > 0) {
-							console.log(response.result.list);
-							const assets_ = response.result.list.filter((asset: Asset) => {
-								if (Number(asset.equity) > 0) {
-									return asset;
-								}
-							});
-
-							clientAssets[id] = assets_;
-							assets = [...assets, ...assets_];
-							console.log("RESPONSE", clientAssets);
-						}
-					}
-					setAllAssets(filterDuplicateAssets(assets));
-					setClientAssets(clientAssets);
-				} catch (err) {
-					console.log(err);
-				}
-			})();
 		}, 2500);
 
 		return () => clearInterval(id);
 	}, [perpClients]);
+
+	// useEffect(() => {
+	// 	(async () => {
+	// 		const logger = {
+	// 			...DefaultLogger,
+	// 			silly: () => {},
+	// 		};
+
+	// 		const key = "VGO4EhQVl6QKdR3ASz";
+	// 		const secret = "xZ9nkI81I9uLqoHyKtoQckYxWO0YNYKA9lwl";
+
+	// 		const market = "contractUSDT";
+	// 		const wsClient = new WebsocketClient(
+	// 			{
+	// 				key: key,
+	// 				secret: secret,
+	// 				market: market,
+	// 				// testnet: true,
+	// 				restOptions: {
+	// 					// enable_time_sync: true,
+	// 				},
+	// 			},
+	// 			logger
+	// 		);
+
+	// 		wsClient.on("update", (data) => {
+	// 			console.log("raw message received ", JSON.stringify(data, null, 2));
+	// 		});
+
+	// 		wsClient.on("open", (data) => {
+	// 			console.log("connection opened open:", data.wsKey);
+	// 		});
+	// 		wsClient.on("response", (data) => {
+	// 			console.log("ws response: ", JSON.stringify(data, null, 2));
+	// 		});
+	// 		wsClient.on("reconnect", ({ wsKey }) => {
+	// 			console.log("ws automatically reconnecting.... ", wsKey);
+	// 		});
+	// 		wsClient.on("reconnected", (data) => {
+	// 			console.log("ws has reconnected ", data?.wsKey);
+	// 		});
+	// 		wsClient.on("error", (data) => {
+	// 			console.error("ws exception: ", data);
+	// 		});
+
+	// 		// subscribe to private endpoints
+	// 		// check the api docs in your api category to see the available topics
+	// 		// wsClient.subscribe(['position', 'execution', 'order', 'wallet']);
+
+	// 		// Contract v3
+	// 		wsClient.subscribe([
+	// 			"user.position.contractAccount",
+	// 			"user.execution.contractAccount",
+	// 			"user.order.contractAccount",
+	// 			"user.wallet.contractAccount",
+	// 		]);
+	// 	})();
+	// }, []);
 
 	//get all derivative assets over > 0, for each client
 	// useEffect(() => {
@@ -321,6 +380,7 @@ export default function AccountDashboard() {
 				transferAssetsInternally={transferAssetsInternally}
 				open={openTransferModal}
 				setOpen={setOpenTransferModal}
+				getAllAssets={getAllAssets}
 			/>
 
 			<div className="mx-auto max-w-7xl sm:px-6 lg:px-8 bg-white w-full py-10 space-y-5">

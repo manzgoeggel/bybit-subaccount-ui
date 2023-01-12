@@ -5,7 +5,7 @@ import { Asset } from "../PositionTable";
 import Amount from "./Amount";
 import SelectAccount from "./SelectAccount";
 import SelectCoin from "./SelectCoin";
-import { Account, ClientAssets } from "../../pages/index";
+import { Account, ClientAssets, getAllAssets } from "../../pages/index";
 
 interface AssetTransferModalProps {
 	accounts: Account;
@@ -14,6 +14,7 @@ interface AssetTransferModalProps {
 	transferAssetsInternally: (amount: string, coin: string, fromAccountId: string, toAccountId: string) => void;
 	open: boolean;
 	setOpen: (value: boolean) => void;
+	getAllAssets: () => Promise<void>;
 }
 
 export default function AssetTransferModal({
@@ -49,6 +50,7 @@ export default function AssetTransferModal({
 				return;
 			}
 			await transferAssetsInternally(`${Number(amount).toFixed(2)}`, selectedAsset.coin, selectedFromAccount, selectedToAccount);
+			await getAllAssets();
 		} catch (err) {
 			console.log(err);
 		}

@@ -1,18 +1,27 @@
 import { Listbox, Transition } from '@headlessui/react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
 import { Fragment, useState } from 'react'
+import { UMOrderType } from "bybit-api";
 
-const orderTypes = [
-  { id: 1, name: 'Market' },
-  { id: 2, name: 'Limit' },
-]
 
-function classNames(...classes) {
-  return classes.filter(Boolean).join(' ')
+export interface OrderTypeObject {
+  id: number;
+  type: UMOrderType
 }
 
-export default function SelectOrderType() {
-  const [selected, setSelected] = useState(orderTypes[0])
+function classNames(...classes: string[]) {
+  return classes.filter(Boolean).join(' ')
+}
+interface SelectOrderTypeProps {
+  selected: OrderTypeObject;
+  setSelected: (val: OrderTypeObject) => void;
+}
+
+const orderTypes: OrderTypeObject[] = [
+  { id: 1, type: "Market" },
+  { id: 2, type: "Limit" },
+]
+export function SelectOrderType({selected, setSelected}: SelectOrderTypeProps) {
 
   return (
     <Listbox value={selected} onChange={setSelected}>
@@ -21,7 +30,7 @@ export default function SelectOrderType() {
           <Listbox.Label className="block text-xs font-medium text-gray-700">Ordertype</Listbox.Label>
           <div className="relative mt-1 w-full">
             <Listbox.Button className="relative w-full cursor-default rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-xs">
-              <span className="block truncate">{selected.name}</span>
+              <span className="block truncate">{selected.type}</span>
               <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                 <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
               </span>
@@ -49,7 +58,7 @@ export default function SelectOrderType() {
                     {({ selected, active }) => (
                       <>
                         <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>
-                          {person.name}
+                          {person.type}
                         </span>
 
                         {selected ? (

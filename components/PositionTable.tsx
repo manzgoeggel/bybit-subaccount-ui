@@ -43,6 +43,7 @@ interface PositionTableProps {
 	client: ContractClient;
 	type: AccountType;
 	disabledPositions: string[];
+	openOrderSlideOver: () => void;
 }
 
 export interface Asset {
@@ -62,7 +63,7 @@ export interface Asset {
 	accountMM: string;
 }
 export const colors = ["blue", "purple", "green", "violet", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose", "yellow", "cyan", "red","indigo", "gray", "emerald", "orange", "blue", "rose", "green"];
-export function PositionTable({ accountId, positions, colorIndex, closePosition, client, type, disabledPositions }: PositionTableProps) {
+export function PositionTable({ accountId, positions, colorIndex, closePosition, client, type, disabledPositions,openOrderSlideOver }: PositionTableProps) {
 	const [assets, setAssets] = useState<Asset[]>([]);
 	const sortedPositions: Position[] = useMemo(() => {
 		if (positions !== undefined && positions.length > 0) {
@@ -115,6 +116,14 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 						{type === AccountType.MAIN ? "Mainaccount" : "Subaccount"} #{accountId}
 					</span>
 
+				    <button
+					onClick={openOrderSlideOver}
+        type="button"
+        className="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+      >
+       manage orders
+      </button>
+					
 					<div>
 						<div className="text-gray-600 text-xs py-2">Available derivative balances:</div>
 						{assets.length > 0 ? (

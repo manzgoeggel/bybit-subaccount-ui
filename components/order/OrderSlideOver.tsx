@@ -1,14 +1,15 @@
 import { Dialog, Transition } from "@headlessui/react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
-import { ContractClient, UMOrderType, OrderSide, USDCTimeInForce } from "bybit-api";
-import { Fragment, useEffect, useState, useMemo } from "react";
-import { AccountType } from "../../pages/index";
-import { colors } from "../PositionTable";
-import { SelectOrderType, OrderTypeObject } from "./SelectOrderType";
-import { SelectTimeInForce, TimeInForce } from "./SelectTimeInForce";
-import { SelectSymbol, Symbol } from "./SelectSymbol";
-import { toast, ToastContainer } from "react-toastify";
 import { XCircleIcon } from "@heroicons/react/20/solid";
+import { XMarkIcon } from "@heroicons/react/24/outline";
+import { ContractClient, OrderSide, UMOrderType, USDCTimeInForce } from "bybit-api";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { toast, ToastContainer } from "react-toastify";
+import { AccountType, PerpClient } from "../../pages/index";
+import { colors } from "../PositionTable";
+import { OrderTypeObject, SelectOrderType } from "./SelectOrderType";
+import { SelectSymbol, Symbol } from "./SelectSymbol";
+import { SelectTimeInForce, TimeInForce } from "./SelectTimeInForce";
+import { useLocalStorage } from "react-use";
 interface Order {
 	symbol: string;
 	orderId: string;
@@ -41,30 +42,27 @@ interface Order {
 	closeOnTrigger: boolean;
 }
 
-export default function OrderSlideOver() {
-	const [open, setOpen] = useState(true);
-	const [orders, setOrders] = useState<Order[]>([]);
+interface SlideOverProps {
+	symbols: Symbol[];
+	perpClient: PerpClient;
+	open: boolean;
+	setOpen: (val: boolean) => void;
+}
+
+export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: SlideOverProps) {
+	const [orders, setOrders] = useLocalStorage<Order[]>(`order${perpClient.id}`, []);
 	const [selectedOrderType, setSelectedOrderType] = useState<OrderTypeObject>({ id: 1, type: "Limit" });
 	const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
 	const [price, setPrice] = useState("0");
 	const [quantity, setQuantity] = useState("");
 	const [timeInForce, setTimeInForce] = useState<TimeInForce>({ id: 1, type: "GoodTillCancel" });
-	const [symbols, setSymbols] = useState<Symbol[]>([]);
+
+	const [fetchingAllOrders, setFetchingAllOrders] = useState(false);
 
 	//mock data
 	const type = AccountType.MAIN;
 	const accountId = "1143183";
 	const chosenIndex = 3;
-
-	const perpClient = useMemo(() => {
-		return new ContractClient({
-			key: "VGO4EhQVl6QKdR3ASz",
-			secret: "xZ9nkI81I9uLqoHyKtoQckYxWO0YNYKA9lwl",
-			strict_param_validation: true,
-			testnet: true,
-			recv_window: 5000 * 1000,
-		});
-	}, []);
 
 	//@TODO
 	/*
@@ -85,11 +83,11 @@ export default function OrderSlideOver() {
 		price?: string
 	): Promise<void> {
 		let requestObject: any = { symbol, side, orderType, qty, timeInForce };
-
 		if (price && orderType !== "Market" && price !== "0") {
 			requestObject["price"] = price;
 		}
-		toast.promise(perpClient.submitOrder(requestObject), {
+		console.log(requestObject);
+		toast.promise(perpClient.perpClient.submitOrder(requestObject), {
 			pending: "creating order.",
 			success: `Successfully created order.`,
 			error: {
@@ -98,29 +96,47 @@ export default function OrderSlideOver() {
 				},
 			},
 		});
-		await fetchAllOpenOrders(symbols);
+		if (orders) {
+			await fetchNewOrders(orders, symbol);
+		} else {
+			await fetchAllOpenOrders(symbols);
+		}
+	}
+
+	async function fetchNewOrders(_orders: Order[], newTicker: string) {
+		const _symbols: string[] = _orders.map((i) => i.symbol);
+		_symbols.push(newTicker);
+		if (_symbols.length > 0) {
+			const orders_ = [];
+			for await (const symbol of _symbols) {
+				await new Promise((r) => setTimeout(r, 250));
+				const fetchedOrders = await perpClient.perpClient.getActiveOrders({ symbol });
+				if (fetchedOrders.result?.list?.length !== undefined && fetchedOrders.result.list.length > 0) {
+					orders_.push(fetchedOrders.result.list);
+				}
+			}
+			const flattenedArray: Order[] = orders_.reduce((acc, val) => acc.concat(val), []);
+			setOrders(flattenedArray);
+		}
 	}
 
 	async function fetchAllOpenOrders(_symbols: Symbol[]) {
 		if (_symbols.length > 0) {
 			const orders_ = [];
 			for await (const item of _symbols) {
-				console.log("symbol:",item.symbol)
 				await new Promise((r) => setTimeout(r, 250));
-				const fetchedOrders = await perpClient.getActiveOrders({ symbol: item.symbol });
+				const fetchedOrders = await perpClient.perpClient.getActiveOrders({ symbol: item.symbol });
 				if (fetchedOrders.result?.list?.length !== undefined && fetchedOrders.result.list.length > 0) {
 					orders_.push(fetchedOrders.result.list);
 				}
 			}
-			console.log("ORDERS__", orders_);
 			const flattenedArray: Order[] = orders_.reduce((acc, val) => acc.concat(val), []);
-			console.log("ORDERS", flattenedArray);
 			setOrders(flattenedArray);
 		}
 	}
 
 	async function cancelOrder(symbol: string, orderId: string): Promise<void> {
-		toast.promise(perpClient.cancelOrder({ symbol, orderId }), {
+		toast.promise(perpClient.perpClient.cancelOrder({ symbol, orderId }), {
 			pending: "Cancelling order.",
 			success: `Successfully cancelled order.`,
 			error: {
@@ -129,6 +145,11 @@ export default function OrderSlideOver() {
 				},
 			},
 		});
+		if (orders) {
+			await fetchNewOrders(orders, symbol);
+		} else {
+			await fetchAllOpenOrders(symbols);
+		}
 	}
 
 	useEffect(() => {
@@ -138,35 +159,28 @@ export default function OrderSlideOver() {
 	}, [selectedOrderType]);
 
 	useEffect(() => {
+		if (orders && orders.length > 0) {
+			return;
+		}
+
 		(async () => {
 			try {
-				const symbols_ = await perpClient.getSymbolTicker("");
-				if (symbols_.result.list.length > 0) {
-					setSymbols(symbols_.result.list);
-					setSelectedSymbol(symbols_.result.list[0]);
-					await fetchAllOpenOrders(symbols_.result.list);
+				setFetchingAllOrders(true);
+
+				if (symbols.length > 0) {
+					setSelectedSymbol(symbols[0]);
+					await fetchAllOpenOrders(symbols);
+					setFetchingAllOrders(false);
 				}
 			} catch (err) {
+				setFetchingAllOrders(false);
 				console.log(err);
 			}
 		})();
-	}, []);
-
+	}, [orders, symbols]);
 
 	return (
 		<>
-			<ToastContainer
-				position="bottom-right"
-				autoClose={2000}
-				hideProgressBar={false}
-				newestOnTop={false}
-				closeOnClick
-				rtl={false}
-				pauseOnFocusLoss
-				draggable
-				pauseOnHover
-				theme="light"
-			/>
 			<Transition.Root show={open} as={Fragment}>
 				<Dialog as="div" className="relative z-10" onClose={setOpen}>
 					<div className="fixed inset-0" />
@@ -183,13 +197,13 @@ export default function OrderSlideOver() {
 									leaveFrom="translate-x-0"
 									leaveTo="translate-x-full"
 								>
-									<Dialog.Panel className="pointer-events-auto w-screen max-w-md">
+									<Dialog.Panel className="pointer-events-auto w-screen max-w-lg">
 										<div className="flex h-full flex-col overflow-y-scroll bg-white py-6 shadow-xl">
 											<div className="px-4 sm:px-6">
 												<span
 													className={`inline-flex items-center rounded-md bg-${colors[chosenIndex]}-100 px-2.5 py-0.5 text-xs font-medium text-${colors[chosenIndex]}-800`}
 												>
-													{type === AccountType.MAIN ? "Mainaccount" : "Subaccount"} #{accountId}
+													{perpClient.type === AccountType.MAIN ? "Mainaccount" : "Subaccount"} #{perpClient.id}
 												</span>
 												<div className="flex items-start justify-between mt-2">
 													<Dialog.Title className="text-lg font-medium text-gray-900">Manage orders</Dialog.Title>
@@ -265,16 +279,19 @@ export default function OrderSlideOver() {
 													<SelectSymbol symbols={symbols} selectedSymbol={selectedSymbol} setSelectedSymbol={setSelectedSymbol} />
 												</div>
 												<div className="flex space-x-6">
-													<SelectTimeInForce timeInForce={timeInForce} selectTimeInForce={setTimeInForce} />
+													<SelectTimeInForce timeInForce={timeInForce} setTimeInForce={setTimeInForce} />
 												</div>
 
 												{/* buy / sell button */}
 												<div className="flex justify-evenly w-full space-x-6 mx-auto">
 													<button
 														onClick={() => {
-															postOrder(selectedSymbol?.name, selectedOrderType.type, quantity, timeInForce, "Buy", price);
+															if (selectedSymbol) {
+																postOrder(selectedSymbol?.symbol, selectedOrderType.type, quantity, timeInForce.type, "Buy", price);
+															}
+															
 														}}
-														disabled={selectedSymbol === null || Number(quantity) <= 0}
+														disabled={!selectedSymbol || selectedSymbol === null || Number(quantity) <= 0}
 														type="button"
 														className="disabled:opacity-50 disabled:cursor-not-allowed  items-center rounded border border-transparent bg-green-500 px-2.5 py-1.5 w-full text-center flex justify-center text-xs font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:green-500 focus:ring-offset-2 transition-all duration-150 ease-in"
 													>
@@ -282,10 +299,13 @@ export default function OrderSlideOver() {
 													</button>
 													<button
 														onClick={() => {
-															postOrder(selectedSymbol?.name, selectedOrderType.type, quantity, timeInForce, "Sell", price);
+															if (selectedSymbol) {
+																postOrder(selectedSymbol?.symbol, selectedOrderType.type, quantity, timeInForce.type, "Sell", price);
+															}
+														
 														}}
 														type="button"
-														disabled={selectedSymbol === null || Number(quantity) <= 0}
+														disabled={!selectedSymbol || selectedSymbol === null || Number(quantity) <= 0}
 														className="disabled:opacity-50 disabled:cursor-not-allowed items-center rounded border border-transparent bg-red-500 px-2.5 py-1.5 w-full text-center flex justify-center text-xs font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:red-500 focus:ring-offset-2 transition-all duration-150 ease-in"
 													>
 														Sell
@@ -298,30 +318,41 @@ export default function OrderSlideOver() {
 												</div>
 											</div>
 											<ul role="list" className="divide-y divide-gray-200  flex-1 overflow-y-auto px-4 sm:px-6">
-												{orders.length > 0 ? (
-													<>
-														{" "}
-														{orders.map((order: Order) => (
-															<li key={order.orderId} className="py-4 text-gray-800 text-tiny flex w-full space-x-2">
-																<p className={`font-medium ${order.side === "Buy" ? "text-green-500" : "text-red-500"}`}>{order.side}</p>
-																<p className="font-semibold">{order.qty}</p>
-																<p className="font-semibold">{order.symbol}</p>
-																<p>@ ${order.price}</p>
-																<p>(notional ~${(Number(order.price) * Number(order.qty)).toFixed(2)})</p>
-																<p className="text-gray-500">{order.orderStatus}</p>
-																<p className="text-gray-500">{order.timeInForce}</p>
-																<XCircleIcon
-																	onClick={() => {
-																		cancelOrder(order.symbol, order.orderId);
-																	}}
-																	className="h-3 w-3 text-gray-500 hover:text-red-500 ease-in transition-all cursor-pointer"
-																	aria-hidden="true"
-																/>
-															</li>
-														))}
-													</>
+												{fetchingAllOrders ? (
+													<div className="text-gray-600 text-xs">fetching orders...</div>
 												) : (
-													<div className="text-gray-600 text-xs">no orders found.</div>
+													<>
+														{orders && orders.length > 0 ? (
+															<>
+																{" "}
+																{orders.map((order: Order, index: number) => (
+																	<li
+																		key={order.orderId + timeInForce + index}
+																		className="py-4 text-gray-800 text-tiny flex w-full space-x-2 flex justify-between"
+																	>
+																		<p className={`font-medium ${order.side === "Buy" ? "text-green-500" : "text-red-500"}`}>
+																			{order.side}
+																		</p>
+																		<p className="font-semibold">{order.qty}</p>
+																		<p className="font-semibold">{order.symbol}</p>
+																		<p>@ ${order.price}</p>
+																		<p>(notional ~${(Number(order.price) * Number(order.qty)).toFixed(2)})</p>
+																		<p className="text-gray-500">{order.orderStatus}</p>
+																		<p className="text-gray-500">{order.timeInForce}</p>
+																		<XCircleIcon
+																			onClick={() => {
+																				cancelOrder(order.symbol, order.orderId);
+																			}}
+																			className="h-3 w-3 text-gray-500 hover:text-red-500 ease-in transition-all cursor-pointer"
+																			aria-hidden="true"
+																		/>
+																	</li>
+																))}
+															</>
+														) : (
+															<div className="text-gray-600 text-xs">no orders found.</div>
+														)}
+													</>
 												)}
 											</ul>
 										</div>

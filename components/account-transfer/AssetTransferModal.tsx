@@ -5,7 +5,7 @@ import { Asset } from "../PositionTable";
 import Amount from "./Amount";
 import SelectAccount from "./SelectAccount";
 import SelectCoin from "./SelectCoin";
-import { Account, ClientAssets, getAllAssets } from "../../pages/index";
+import { Account, ClientAssets } from "../../pages/index";
 
 interface AssetTransferModalProps {
 	accounts: Account;
@@ -24,6 +24,7 @@ export default function AssetTransferModal({
 	transferAssetsInternally,
 	open,
 	setOpen,
+	getAllAssets
 }: AssetTransferModalProps) {
 	const [selectedFromAccount, setSelectedFromAccount] = useState("");
 	const [selectedToAccount, setSelectedToAccount] = useState("");

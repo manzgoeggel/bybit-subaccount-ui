@@ -9,7 +9,7 @@ const timeInForces = [
   { id: 4, type: 'PostOnly' },
 ]
 
-function classNames(...classes) {
+function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ')
 }
 
@@ -57,13 +57,13 @@ export function SelectTimeInForce({timeInForce, setTimeInForce}: SelectTimeInFor
                     }
                     value={person}
                   >
-                    {({ timeInForce, active }) => (
+                    {({ selected, active }) => (
                       <>
-                        <span className={classNames(timeInForce ? 'font-semibold' : 'font-normal', 'block truncate')}>
+                        <span className={classNames(selected ? 'font-semibold' : 'font-normal', 'block truncate')}>
                           {person.type}
                         </span>
 
-                        {timeInForce ? (
+                        {selected ? (
                           <span
                             className={classNames(
                               active ? 'text-white' : 'text-indigo-600',

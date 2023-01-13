@@ -7,6 +7,7 @@ import DropZoneModal from "../components/DropZone";
 import { Asset, Position, PositionTable } from "../components/PositionTable";
 import OrderSlideOver from "../components/order/OrderSlideOver";
 import { toast, ToastContainer } from "react-toastify";
+import {Symbol} from "../components/order/SelectSymbol";
 import "react-toastify/dist/ReactToastify.css";
 export enum AccountType {
 	MAIN = "main",
@@ -21,7 +22,7 @@ export interface Account {
 	};
 }
 
-interface PerpClient {
+export interface PerpClient {
 	perpClient: ContractClient;
 	id: string;
 	type: AccountType;
@@ -46,6 +47,11 @@ export default function AccountDashboard() {
 	const [allAssets, setAllAssets] = useState<Asset[]>([]);
 	const [openTransferModal, setOpenTransferModal] = useState(false);
 	const isCmdKPressed = useKeyPress((e) => e.metaKey && e.key === "k");
+
+	//SlideOverComponent
+	const [openOrderSlideOver, setOpenOrderSlideOver] = useState(false);
+	const [symbols, setSymbols] = useLocalStorage<Symbol[]>("symbols", []);
+	const [selectedClient, setSelectedClient] = useState<PerpClient>();
 
 	// const [accounts, setAccounts] = useState<Account>({});
 	const [accounts, setAccounts, remove] = useLocalStorage<Account>("accounts", {});
@@ -160,6 +166,22 @@ export default function AccountDashboard() {
 			});
 		}
 	}
+
+	useEffect(() => {
+		async () => {
+			try {
+				const symbols_ = await perpClients[0].perpClient.getSymbolTicker("linear");
+
+				if (symbols_.result.list.length > 0) {
+					//filter for USDT pairs
+					const filteredSymbols: Symbol[] = symbols_.result.list.filter((i) => i.symbol.includes("USDT"));
+					setSymbols(filteredSymbols);
+				}
+			} catch (err) {
+				console.log(err);
+			}
+		};
+	}, []);
 	useEffect(() => {
 		if (!accounts || Object.keys(accounts).length === 0) {
 			setOpen(true);
@@ -261,7 +283,6 @@ export default function AccountDashboard() {
 	}, [isCmdKPressed, allAssets]);
 	return (
 		<div className="min-h-screen w-screen bg-gray-50 flex flex-col justify-center">
-			<OrderSlideOver />
 			<ToastContainer
 				position="bottom-right"
 				autoClose={2000}
@@ -274,6 +295,13 @@ export default function AccountDashboard() {
 				pauseOnHover
 				theme="light"
 			/>
+			{selectedClient && symbols && <OrderSlideOver
+				symbols={symbols}
+				open={openOrderSlideOver}
+				setOpen={setOpenOrderSlideOver}
+				perpClient={selectedClient}
+			/>}
+			
 			<DropZoneModal open={open} setOpen={setOpen} accounts={accounts || {}} setAccounts={setAccounts} />
 			<AssetTransferModal
 				accounts={accounts || {}}
@@ -319,6 +347,10 @@ export default function AccountDashboard() {
 							closePosition={closePosition}
 							type={account.type}
 							disabledPositions={disabledPositions}
+							openOrderSlideOver={() => {
+								setSelectedClient(account);
+								setOpenOrderSlideOver(true);
+							}}
 						/>
 					))}
 			</div>

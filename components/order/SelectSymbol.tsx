@@ -81,7 +81,7 @@ export function SelectSymbol({selectedSymbol,setSelectedSymbol, symbols}: Select
 									<>
 										 <div className="flex items-center">
 											{/*<img src={symbol.imageUrl} alt="" className="h-6 w-6 flex-shrink-0 rounded-full" />*/}
-											<span className={classNames("ml-3 truncate", selected && "font-semibold")}>{symbol.symbol}</span>
+											<span className={classNames("ml-3 truncate")}>{symbol.symbol}</span>
 										</div> 
 
 										{selected && (

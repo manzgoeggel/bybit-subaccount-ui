@@ -347,6 +347,7 @@ export default function AccountDashboard() {
 							closePosition={closePosition}
 							type={account.type}
 							disabledPositions={disabledPositions}
+							enabledSlideOver={symbols && symbols.length}
 							openOrderSlideOver={() => {
 								setSelectedClient(account);
 								setOpenOrderSlideOver(true);

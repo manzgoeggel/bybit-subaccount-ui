@@ -7,7 +7,7 @@ import DropZoneModal from "../components/DropZone";
 import { Asset, Position, PositionTable } from "../components/PositionTable";
 import OrderSlideOver from "../components/order/OrderSlideOver";
 import { toast, ToastContainer } from "react-toastify";
-import {Symbol} from "../components/order/SelectSymbol";
+import { Symbol } from "../components/order/SelectSymbol";
 import "react-toastify/dist/ReactToastify.css";
 export enum AccountType {
 	MAIN = "main",
@@ -168,20 +168,23 @@ export default function AccountDashboard() {
 	}
 
 	useEffect(() => {
-		async () => {
-			try {
-				const symbols_ = await perpClients[0].perpClient.getSymbolTicker("linear");
+		if (!symbols || symbols.length === 0) {
+			async () => {
+				try {
+					const symbols_ = await perpClients[0].perpClient.getSymbolTicker("linear");
 
-				if (symbols_.result.list.length > 0) {
-					//filter for USDT pairs
-					const filteredSymbols: Symbol[] = symbols_.result.list.filter((i) => i.symbol.includes("USDT"));
-					setSymbols(filteredSymbols);
+					if (symbols_.result.list.length > 0) {
+						//filter for USDT pairs
+						const filteredSymbols: Symbol[] = symbols_.result.list.filter((i) => i.symbol.includes("USDT"));
+						console.log("SYMBOLS",filteredSymbols);
+						setSymbols(filteredSymbols);
+					}
+				} catch (err) {
+					console.log(err);
 				}
-			} catch (err) {
-				console.log(err);
-			}
-		};
-	}, []);
+			};
+		}
+	}, [perpClients, symbols]);
 	useEffect(() => {
 		if (!accounts || Object.keys(accounts).length === 0) {
 			setOpen(true);
@@ -295,13 +298,10 @@ export default function AccountDashboard() {
 				pauseOnHover
 				theme="light"
 			/>
-			{selectedClient && symbols && <OrderSlideOver
-				symbols={symbols}
-				open={openOrderSlideOver}
-				setOpen={setOpenOrderSlideOver}
-				perpClient={selectedClient}
-			/>}
-			
+			{selectedClient && symbols && (
+				<OrderSlideOver symbols={symbols} open={openOrderSlideOver} setOpen={setOpenOrderSlideOver} perpClient={selectedClient} />
+			)}
+
 			<DropZoneModal open={open} setOpen={setOpen} accounts={accounts || {}} setAccounts={setAccounts} />
 			<AssetTransferModal
 				accounts={accounts || {}}

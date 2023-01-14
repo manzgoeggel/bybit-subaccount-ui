@@ -63,8 +63,40 @@ export interface Asset {
 	accountIM: string;
 	accountMM: string;
 }
-export const colors = ["blue", "purple", "green", "violet", "orange", "lime", "fuchsia", "sky", "pink", "teal", "rose", "yellow", "cyan", "red","indigo", "gray", "emerald", "orange", "blue", "rose", "green"];
-export function PositionTable({ accountId, positions, colorIndex, closePosition, client, type, disabledPositions,openOrderSlideOver,enabledSlideOver }: PositionTableProps) {
+export const colors = [
+	"blue",
+	"purple",
+	"green",
+	"violet",
+	"orange",
+	"lime",
+	"fuchsia",
+	"sky",
+	"pink",
+	"teal",
+	"rose",
+	"yellow",
+	"cyan",
+	"red",
+	"indigo",
+	"gray",
+	"emerald",
+	"orange",
+	"blue",
+	"rose",
+	"green",
+];
+export function PositionTable({
+	accountId,
+	positions,
+	colorIndex,
+	closePosition,
+	client,
+	type,
+	disabledPositions,
+	openOrderSlideOver,
+	enabledSlideOver,
+}: PositionTableProps) {
 	const [assets, setAssets] = useState<Asset[]>([]);
 	const sortedPositions: Position[] = useMemo(() => {
 		if (positions !== undefined && positions.length > 0) {
@@ -93,7 +125,7 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 		(async () => {
 			try {
 				const response = await client.getBalances();
-				console.log("RES2", response)
+				console.log("RES2", response);
 				if (response.result.list.length > 0) {
 					const assets_ = response.result.list.filter((asset: Asset) => {
 						if (Number(asset.equity) > 0) {
@@ -102,30 +134,29 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 					});
 					setAssets(assets_);
 				}
-			} catch (err) {
-			}
+			} catch (err) {}
 		})();
 	}, [client]);
 
 	return (
 		<div className="px-4 sm:px-6 lg:px-8">
 			<div className="sm:flex sm:items-center">
-				<div className="sm:flex-auto">
+				<div className="sm:flex-auto space-x-3">
 					<span
 						className={`inline-flex items-center rounded-md bg-${colors[chosenIndex]}-100 px-2.5 py-0.5 text-xs font-medium text-${colors[chosenIndex]}-800`}
 					>
 						{type === AccountType.MAIN ? "Mainaccount" : "Subaccount"} #{accountId}
 					</span>
 
-				    <button
-					onClick={openOrderSlideOver}
-        type="button"
-		disabled={!enabledSlideOver}
-        className="inline-flex items-center rounded border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-       manage orders
-      </button>
-					
+					<button
+						onClick={openOrderSlideOver}
+						type="button"
+						disabled={!enabledSlideOver}
+						className="inline-flex items-center rounded border border-gray-300 bg-white px-2 py-0.25 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+					>
+						manage orders
+					</button>
+
 					<div>
 						<div className="text-gray-600 text-xs py-2">Available derivative balances:</div>
 						{assets.length > 0 ? (
@@ -216,7 +247,6 @@ export function PositionTable({ accountId, positions, colorIndex, closePosition,
 																	position.side.toLowerCase() === "sell" ? "Buy" : "Sell",
 																	position.size,
 																	accountId
-
 																);
 															}}
 															disabled={disabledPositions.includes(position.symbol + position.size + accountId)}

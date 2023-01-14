@@ -53,11 +53,18 @@ export default function AccountDashboard() {
 	const [symbols, setSymbols] = useLocalStorage<Symbol[]>("symbols", []);
 	const [selectedClient, setSelectedClient] = useState<PerpClient>();
 
-	// const [accounts, setAccounts] = useState<Account>({});
-	const [accounts, setAccounts, remove] = useLocalStorage<Account>("accounts", {});
+	const [accounts, setAccounts, removeAccounts] = useLocalStorage<Account>("accounts", {});
 	const [open, setOpen] = useState(false);
 	const [disabledPositions, setDisabledPositions] = useState([""]);
 	const [isLoading, setIsLoading] = useState(false);
+
+	function logOut() {
+		setPerpClients([]);
+		setClientPositions({});
+		setAllAssets([]);
+		removeAccounts();
+	}
+
 	async function initiateClients(accounts: Account): Promise<PerpClient[]> {
 		//initiate the client for each Account
 		const clients: PerpClient[] = [];
@@ -176,7 +183,7 @@ export default function AccountDashboard() {
 					if (symbols_.result.list.length > 0) {
 						//filter for USDT pairs
 						const filteredSymbols: Symbol[] = symbols_.result.list.filter((i) => i.symbol.includes("USDT"));
-						console.log("SYMBOLS",filteredSymbols);
+						console.log("SYMBOLS", filteredSymbols);
 						setSymbols(filteredSymbols);
 					}
 				} catch (err) {
@@ -317,12 +324,25 @@ export default function AccountDashboard() {
 				<div className="border-b border-gray-200 bg-white px-4 py-5 sm:px-6">
 					<div className="-ml-4 -mt-4 flex flex-wrap items-center justify-between sm:flex-nowrap">
 						<div className="ml-4 mt-4">
-							<h3 className="text-lg font-medium leading-6 text-gray-900">Manage your Bybit subaccounts</h3>
+							<div className="flex space-x-3">
+								<h3 className="text-lg font-medium leading-6 text-gray-900">Manage your Bybit subaccounts</h3>
+								<span className="inline-flex items-center rounded bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800 uppercase">
+									testnet
+								</span>
+							</div>
+
 							<p className="mt-1 text-sm text-gray-500">
 								Transfer assets between subaccounts & manage positions. Press {`"`}CMD + K{`"`} to quickly transfer assets.
 							</p>
 						</div>
-						<div className="ml-4 mt-4 flex-shrink-0">
+						<div className="ml-4 mt-4 flex-shrink-0 space-x-3">
+							<button
+								onClick={logOut}
+								type="button"
+								className="relative inline-flex items-center rounded-md border border-transparent bg-white px-4 py-2 text-sm font-medium text-gray-500 shadow-sm hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-2 transition-all duration-150 ease-in disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								Logout
+							</button>
 							<button
 								onClick={() => {
 									setOpenTransferModal(true);

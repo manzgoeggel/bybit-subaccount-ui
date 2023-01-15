@@ -125,7 +125,6 @@ export function PositionTable({
 		(async () => {
 			try {
 				const response = await client.getBalances();
-				console.log("RES2", response);
 				if (response.result.list.length > 0) {
 					const assets_ = response.result.list.filter((asset: Asset) => {
 						if (Number(asset.equity) > 0) {
@@ -136,7 +135,7 @@ export function PositionTable({
 				}
 			} catch (err) {}
 		})();
-	}, [client]);
+	}, []);
 
 	return (
 		<div className="px-4 sm:px-6 lg:px-8">

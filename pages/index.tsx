@@ -1,14 +1,14 @@
-import { ContractClient, OrderSide, WebsocketClient, DefaultLogger } from "bybit-api";
+import { ContractClient, OrderSide } from "bybit-api";
 import { useEffect, useState } from "react";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useKeyPress, useLocalStorage } from "react-use";
 import { v4 as uuidv4 } from "uuid";
 import AssetTransferModal from "../components/account-transfer/AssetTransferModal";
 import DropZoneModal from "../components/DropZone";
-import { Asset, Position, PositionTable } from "../components/PositionTable";
 import OrderSlideOver from "../components/order/OrderSlideOver";
-import { toast, ToastContainer } from "react-toastify";
 import { Symbol } from "../components/order/SelectSymbol";
-import "react-toastify/dist/ReactToastify.css";
+import { Asset, Position, PositionTable } from "../components/PositionTable";
 export enum AccountType {
 	MAIN = "main",
 	SUB = "sub",
@@ -50,13 +50,13 @@ export default function AccountDashboard() {
 
 	//SlideOverComponent
 	const [openOrderSlideOver, setOpenOrderSlideOver] = useState(false);
-	const [symbols, setSymbols] = useLocalStorage<Symbol[]>("symbols", []);
+	const [symbols, setSymbols] = useState<Symbol[]>([]);
 	const [selectedClient, setSelectedClient] = useState<PerpClient>();
 
 	const [accounts, setAccounts, removeAccounts] = useLocalStorage<Account>("accounts", {});
 	const [open, setOpen] = useState(false);
 	const [disabledPositions, setDisabledPositions] = useState([""]);
-	const [isLoading, setIsLoading] = useState(false);
+	const [isFetched, setIsFetched] = useState(false);
 
 	function logOut() {
 		setPerpClients([]);
@@ -175,23 +175,22 @@ export default function AccountDashboard() {
 	}
 
 	useEffect(() => {
-		if (!symbols || symbols.length === 0) {
-			async () => {
+		if (symbols.length === 0 && perpClients.length > 0) {
+			(async () => {
 				try {
 					const symbols_ = await perpClients[0].perpClient.getSymbolTicker("linear");
-
 					if (symbols_.result.list.length > 0) {
 						//filter for USDT pairs
 						const filteredSymbols: Symbol[] = symbols_.result.list.filter((i) => i.symbol.includes("USDT"));
-						console.log("SYMBOLS", filteredSymbols);
+
 						setSymbols(filteredSymbols);
 					}
 				} catch (err) {
 					console.log(err);
 				}
-			};
+			})();
 		}
-	}, [perpClients, symbols]);
+	}, [perpClients]);
 	useEffect(() => {
 		if (!accounts || Object.keys(accounts).length === 0) {
 			setOpen(true);
@@ -240,24 +239,33 @@ export default function AccountDashboard() {
 		}
 	}
 
+	// useEffect(() => {
+	// 	if (!isFetched) {
+	// 		//first one, when initiated
+	// 		(async () => {
+	// 			setIsFetched(true);
+	// 			await getAllAssets();
+	// 			const id = toast.loading(`Fetching positions...`, {
+	// 				position: toast.POSITION.BOTTOM_RIGHT,
+	// 			});
+	// 			const positions = await getAllPositions(perpClients);
+	// 			toast.update(id, { render: "fetched positions succesfully.", type: "success", isLoading: false });
+	// 			toast.dismiss(id);
+	// 			setClientPositions(positions);
+	// 		})();
+	// 	}
+	// 	const id = setInterval(async () => {
+	// 		const positions = await getAllPositions(perpClients);
+	// 		setClientPositions(positions);
+	// 	}, 2500);
+
+	// 	return () => clearInterval(id);
+	// }, [perpClients, isFetched]);
+
 	useEffect(() => {
-		//first one, when initiated
 		(async () => {
 			await getAllAssets();
-			const id = toast.loading(`Fetching positions...`, {
-				position: toast.POSITION.BOTTOM_RIGHT,
-			});
-			const positions = await getAllPositions(perpClients);
-			toast.update(id, { render: "fetched positions succesfully.", type: "success", isLoading: false });
-			toast.dismiss(id);
-			setClientPositions(positions);
 		})();
-		const id = setInterval(async () => {
-			const positions = await getAllPositions(perpClients);
-			setClientPositions(positions);
-		}, 2500);
-
-		return () => clearInterval(id);
 	}, [perpClients]);
 
 	async function closePosition(client: ContractClient, symbol: string, side: OrderSide, qty: string, accountId: string): Promise<void> {
@@ -356,24 +364,23 @@ export default function AccountDashboard() {
 						</div>
 					</div>
 				</div>
-				{Object.keys(clientPositions).length > 0 &&
-					perpClients.map((account, index) => (
-						<PositionTable
-							key={account.id}
-							accountId={account.id}
-							positions={clientPositions[account.id].positions}
-							colorIndex={index}
-							client={account.perpClient}
-							closePosition={closePosition}
-							type={account.type}
-							disabledPositions={disabledPositions}
-							enabledSlideOver={symbols !== undefined && symbols.length > 0}
-							openOrderSlideOver={() => {
-								setSelectedClient(account);
-								setOpenOrderSlideOver(true);
-							}}
-						/>
-					))}
+				{perpClients.map((account, index) => (
+					<PositionTable
+						key={account.id}
+						accountId={account.id}
+						positions={clientPositions[account.id]?.positions === undefined ? [] : clientPositions[account.id].positions}
+						colorIndex={index}
+						client={account.perpClient}
+						closePosition={closePosition}
+						type={account.type}
+						disabledPositions={disabledPositions}
+						enabledSlideOver={symbols !== undefined && symbols.length > 0}
+						openOrderSlideOver={() => {
+							setSelectedClient(account);
+							setOpenOrderSlideOver(true);
+						}}
+					/>
+				))}
 			</div>
 		</div>
 	);

@@ -10,6 +10,8 @@ import { OrderTypeObject, SelectOrderType } from "./SelectOrderType";
 import { SelectSymbol, Symbol } from "./SelectSymbol";
 import { SelectTimeInForce, TimeInForce } from "./SelectTimeInForce";
 import { useLocalStorage } from "react-use";
+import Bottleneck from "bottleneck";
+
 interface Order {
 	symbol: string;
 	orderId: string;
@@ -49,15 +51,40 @@ interface SlideOverProps {
 	setOpen: (val: boolean) => void;
 }
 
+enum IsOrders {
+	Unchecked = "Unchecked",
+	None = "None",
+	Found = "Found"
+}
+
 export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: SlideOverProps) {
 	const [orders, setOrders] = useLocalStorage<Order[]>(`order${perpClient.id}`, []);
+	const [isOrders, setIsOrders] = useLocalStorage<IsOrders>(`order${perpClient.id}`, IsOrders.Unchecked);
 	const [selectedOrderType, setSelectedOrderType] = useState<OrderTypeObject>({ id: 1, type: "Limit" });
 	const [selectedSymbol, setSelectedSymbol] = useState<Symbol | null>(null);
 	const [price, setPrice] = useState("0");
 	const [quantity, setQuantity] = useState("");
 	const [timeInForce, setTimeInForce] = useState<TimeInForce>({ id: 1, type: "GoodTillCancel" });
-
+	const [progressPercentage, setProgressPercentage] = useState(0);
 	const [fetchingAllOrders, setFetchingAllOrders] = useState(false);
+	const [isLoaded, setIsLoaded] = useState(false);
+	const limiter = useMemo(() => {
+		return new Bottleneck({
+			maxConcurrent: 70,
+			minTime: 200,
+			highWater: 5,
+			strategy: Bottleneck.strategy.OVERFLOW,
+		});
+	}, []);
+	const quickLimiter = useMemo(() => {
+		return new Bottleneck({
+			minTime: 200, // 200ms delay between requests
+			maxConcurrent: 70, // 70 requests per second for 5 consecutive seconds
+			trackDoneStatus: true,
+			reservoir: 5, // 5 seconds
+			reservoirRefreshInterval: 5 * 1000, // every 5 seconds
+		});
+	}, []);
 
 	//mock data
 	const type = AccountType.MAIN;
@@ -82,24 +109,32 @@ export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: S
 		side: OrderSide,
 		price?: string
 	): Promise<void> {
-		let requestObject: any = { symbol, side, orderType, qty, timeInForce };
-		if (price && orderType !== "Market" && price !== "0") {
-			requestObject["price"] = price;
-		}
-		console.log(requestObject);
-		toast.promise(perpClient.perpClient.submitOrder(requestObject), {
-			pending: "creating order.",
-			success: `Successfully created order.`,
-			error: {
-				render({ data }: any) {
-					return `Error: ${data.message}`;
+		try {
+			let requestObject: any = { symbol, side, orderType, qty, timeInForce };
+			if (price && orderType !== "Market" && price !== "0") {
+				requestObject["price"] = price;
+			}
+			console.log(requestObject);
+			toast.promise(perpClient.perpClient.submitOrder(requestObject), {
+				pending: "creating order.",
+				success: `Successfully created order.`,
+				error: {
+					render({ data }: any) {
+						return `Error: ${data.message}`;
+					},
 				},
-			},
-		});
-		if (orders) {
-			await fetchNewOrders(orders, symbol);
-		} else {
-			await fetchAllOpenOrders(symbols);
+			});
+			setFetchingAllOrders(true);
+			if (orders && isOrders !== IsOrders.Unchecked) {
+				await fetchNewOrders(orders, symbol);
+			} else {
+				await fetchAllOpenOrders(symbols);
+			}
+			setFetchingAllOrders(false);
+		} catch (err) {
+			if (fetchingAllOrders) {
+				setFetchingAllOrders(false);
+			}
 		}
 	}
 
@@ -107,48 +142,91 @@ export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: S
 		const _symbols: string[] = _orders.map((i) => i.symbol);
 		_symbols.push(newTicker);
 		if (_symbols.length > 0) {
-			const orders_ = [];
+			const orders_: Order[] = [];
+			let count = 0;
 			for await (const symbol of _symbols) {
-				await new Promise((r) => setTimeout(r, 250));
-				const fetchedOrders = await perpClient.perpClient.getActiveOrders({ symbol });
+				count++;
+				setProgressPercentage(Math.round((count / _symbols.length) * 100));
+				// wrap the fetching of orders in the limiter
+				const fetchedOrders = await limiter.schedule(() => perpClient.perpClient.getActiveOrders({ symbol }));
+
 				if (fetchedOrders.result?.list?.length !== undefined && fetchedOrders.result.list.length > 0) {
 					orders_.push(fetchedOrders.result.list);
 				}
 			}
-			const flattenedArray: Order[] = orders_.reduce((acc, val) => acc.concat(val), []);
+			const flattenedArray: Order[] = orders_.reduce((acc, val: any) => acc.concat(val), []);
+			if (flattenedArray.length === 0) {
+				setIsOrders(IsOrders.None);
+			} else {
+				setIsOrders(IsOrders.Found);
+			}
 			setOrders(flattenedArray);
 		}
 	}
 
+	// for await (const item of _symbols) {
+	// 	await quickLimiter.schedule(async () => {
+	// 	  const fetchedOrders = await perpClient.perpClient.getActiveOrders({ symbol: item.symbol });
+	// 	  if (fetchedOrders.result?.list?.length !== undefined && fetchedOrders.result.list.length > 0) {
+	// 		orders_.push(fetchedOrders.result.list);
+	// 	  }
+	// 	});
+	// 	await limiter.schedule(() => {
+	// 		const flattenedArray: Order[] = orders_.reduce((acc, val: any) => acc.concat(val), []);
+	// 			console.log("FETCHED ORDERS: ", orders_);
+	// 		setOrders(flattenedArray);
+	// 		return Promise.all(flattenedArray);
+	// 	});
+	//   }
+
 	async function fetchAllOpenOrders(_symbols: Symbol[]) {
 		if (_symbols.length > 0) {
 			const orders_ = [];
+			let count = 0;
 			for await (const item of _symbols) {
-				await new Promise((r) => setTimeout(r, 250));
-				const fetchedOrders = await perpClient.perpClient.getActiveOrders({ symbol: item.symbol });
+				count++;
+				setProgressPercentage(Math.round((count / _symbols.length) * 100));
+				const symbol = item.symbol;
+				// wrap the fetching of orders in the limiter
+				const fetchedOrders = await limiter.schedule(() => perpClient.perpClient.getActiveOrders({ symbol }));
 				if (fetchedOrders.result?.list?.length !== undefined && fetchedOrders.result.list.length > 0) {
 					orders_.push(fetchedOrders.result.list);
 				}
 			}
 			const flattenedArray: Order[] = orders_.reduce((acc, val) => acc.concat(val), []);
+			if (flattenedArray.length === 0) {
+				setIsOrders(IsOrders.None);
+			} else {
+				setIsOrders(IsOrders.Found);
+			}
+			setIsLoaded(true);
 			setOrders(flattenedArray);
 		}
 	}
 
 	async function cancelOrder(symbol: string, orderId: string): Promise<void> {
-		toast.promise(perpClient.perpClient.cancelOrder({ symbol, orderId }), {
-			pending: "Cancelling order.",
-			success: `Successfully cancelled order.`,
-			error: {
-				render({ data }: any) {
-					return `Error: ${data.message}`;
+		try {
+			toast.promise(perpClient.perpClient.cancelOrder({ symbol, orderId }), {
+				pending: "Cancelling order.",
+				success: `Successfully cancelled order.`,
+				error: {
+					render({ data }: any) {
+						return `Error: ${data.message}`;
+					},
 				},
-			},
-		});
-		if (orders) {
-			await fetchNewOrders(orders, symbol);
-		} else {
-			await fetchAllOpenOrders(symbols);
+			});
+			setFetchingAllOrders(true);
+	
+			if (orders && isOrders !== IsOrders.Unchecked) {
+				await fetchNewOrders(orders, symbol);
+			} else {
+				await fetchAllOpenOrders(symbols);
+			}
+			setFetchingAllOrders(false);
+		} catch (err) {
+			if (fetchingAllOrders) {
+				setFetchingAllOrders(false);
+			}
 		}
 	}
 
@@ -159,25 +237,22 @@ export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: S
 	}, [selectedOrderType]);
 
 	useEffect(() => {
-		if (orders && orders.length > 0) {
-			return;
-		}
+		console.log("ORDERS", orders);
+		if (symbols && symbols.length > 0 && !fetchingAllOrders && isOrders !== IsOrders.None && !isLoaded) {
+			(async () => {
+				try {
+					setFetchingAllOrders(true);
 
-		(async () => {
-			try {
-				setFetchingAllOrders(true);
-
-				if (symbols.length > 0) {
 					setSelectedSymbol(symbols[0]);
 					await fetchAllOpenOrders(symbols);
 					setFetchingAllOrders(false);
+				} catch (err) {
+					setFetchingAllOrders(false);
+					console.log(err);
 				}
-			} catch (err) {
-				setFetchingAllOrders(false);
-				console.log(err);
-			}
-		})();
-	}, [orders, symbols]);
+			})();
+		}
+	}, [orders]);
 
 	return (
 		<>
@@ -289,7 +364,6 @@ export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: S
 															if (selectedSymbol) {
 																postOrder(selectedSymbol?.symbol, selectedOrderType.type, quantity, timeInForce.type, "Buy", price);
 															}
-															
 														}}
 														disabled={!selectedSymbol || selectedSymbol === null || Number(quantity) <= 0}
 														type="button"
@@ -302,7 +376,6 @@ export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: S
 															if (selectedSymbol) {
 																postOrder(selectedSymbol?.symbol, selectedOrderType.type, quantity, timeInForce.type, "Sell", price);
 															}
-														
 														}}
 														type="button"
 														disabled={!selectedSymbol || selectedSymbol === null || Number(quantity) <= 0}
@@ -319,10 +392,19 @@ export default function OrderSlideOver({ symbols, perpClient, open, setOpen }: S
 											</div>
 											<ul role="list" className="divide-y divide-gray-200  flex-1 overflow-y-auto px-4 sm:px-6">
 												{fetchingAllOrders ? (
-													<div className="text-gray-600 text-xs">fetching orders...</div>
+													<div className="flex flex-col space-y-2">
+														<div className="text-gray-600 text-xs">fetching orders...</div>
+
+														<div className="h-2 w-full bg-gray-200 rounded-full">
+															<div
+																style={{ width: `${progressPercentage}%` }}
+																className={`h-full rounded-full bg-indigo-500 transition-all duration-150 ease-in`}
+															></div>
+														</div>
+													</div>
 												) : (
 													<>
-														{orders && orders.length > 0 ? (
+														{orders !== undefined && orders.length > 0 ? (
 															<>
 																{" "}
 																{orders.map((order: Order, index: number) => (
